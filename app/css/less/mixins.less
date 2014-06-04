@@ -1,0 +1,97 @@
+/* filter */
+
+.filter(@function) {
+  -webkit-filter: @function;
+  filter: @function;
+}
+
+/* box-sizing */
+
+.box-sizing(@value: content-box) {
+  -moz-box-sizing: @value;
+  -webkit-box-sizing: @value;
+  box-sizing: @value;
+}
+
+/* backface-visibility */
+
+.backface-visibility(@value: visible) {
+  -moz-backface-visibility: visible;
+  -webkit-backface-visibility: visible;
+  backface-visibility: visible;
+}
+
+/* transform */
+
+.transform(@function: none) {
+  -moz-transform: @function;
+  -webkit-transform: @function;
+  transform: @function;
+}
+
+.transform-origin(@value: 50% 50% 0) {
+  -moz-transform-origin: @value;
+  -webkit-transform-origin: @value;
+  transform-origin: @value;
+}
+
+.transform-style(@value: flat) {
+  -moz-transform-style: @value;
+  -webkit-transform-style: @value;
+  transform-style: @value;
+}
+
+.perspective(@value: none) {
+  -moz-perspective: @value;
+  -webkit-perspective: @value;
+  perspective: @value;
+}
+
+.perspective-origin(@value: 50% 50%) {
+  -moz-perspective-origin: @value;
+  -webkit-perspective-origin: @value;
+  perspective-origin: @value;
+}
+
+.backface-visibility(@value: visible) {
+  -moz-backface-visibility: @value;
+  -webkit-backface-visibility: @value;
+  backface-visibility: @value;
+}
+
+/* transition */
+
+.transition(@function: none) {
+  -o-transition: @function;
+  -moz-transition: @function;
+  -webkit-transition: @function;
+  transition: @function;
+}
+
+.transition-delay(@delay: 0) {
+  -o-transition-delay: @delay;
+  -moz-transition-delay: @delay;
+  -webkit-transition-delay: @delay;
+  transition-delay: @delay;
+}
+
+.transition-duration(@duration: 0) {
+  -o-transition-duration: @duration;
+  -moz-transition-duration: @duration;
+  -webkit-transition-duration: @duration;
+  transition-duration: @duration;
+}
+
+.transition-property(@property: all) {
+  -o-transition-property: @property;
+  -moz-transition-property: @property;
+  -webkit-transition-property: @property;
+  transition-property: @property;
+}
+
+.transition-timing-function(@function: ease) {
+  -o-transition-timing-function: @function;
+  -moz-transition-timing-function: @function;
+  -webkit-transition-timing-function: @function;
+  transition-timing-function: @function;
+}
