@@ -1,4 +1,19 @@
 (function () {
+  function addClassTo(name, el) {
+    var list = el.className.split(/\s+/);
+	if (list.indexOf(name) === -1) { list.push(name); }
+	el.className = list.join(' ');
+	return el;
+  }
+
+  function removeClassFrom(name, el) {
+    var list  = el.className.split(/\s+/),
+	    index = list.indexOf(name);
+	if (index !== -1) { list.splice(index, 1); }
+	el.className = list.join(' ');
+	return el;
+  }
+
   function isArray(obj) { return Object.prototype.toString.call(obj) === '[object Array]'; }
   function isInt(n) { return typeof n === 'number' && n % 1 == 0; }
   function div() { return document.createElement('div'); }
@@ -9,11 +24,14 @@
     return args.every(function (item) { return array.indexOf(item) !== -1; });
   }
 
-  var ANIMATION_OPTIONS_ALLOWED = ['x', 'y', 'width', 'height', 'length', 'delays'];
+  var ANIMATION_OPTIONS_ALLOWED = ['x', 'y', 'width', 'height', 'length', 'delays', 'offsetX', 'offsetY'];
 
   function Spritesheet(_name) {
-    var animations = {},
-      current, frame, delay;
+    var CLASS_FLIPPED = 'stage__sprite_style_flipped';
+
+    var animations = {};
+	var flipped = false;
+    var current, frame, delay;
 
     this.x = 0;
     this.y = 0;
@@ -22,15 +40,29 @@
     this.element.style.backgroundImage = 'url(\'app/i/sprites/' + _name + '.png\')';
     this.element.setAttribute('class', 'stage__sprite');
 
-    this.animation = function (name, options) {
-	  var o = options;
+	this.isFlipped = function () { return flipped; }
 
-      if (!name) { throw new Error('Animation without name!');  }
+	this.flip = function () {
+	  flipped = !flipped;
+
+	  if (flipped) { addClassTo(CLASS_FLIPPED, this.element); }
+	  else { removeClassFrom(CLASS_FLIPPED, this.element); }
+
+	  return this;
+	};
+
+    this.animation = function (name, options) {
+	  if (!arguments.length) { return current !== undefined ? current.name : null; }
+
+      if (typeof name !== 'string' || !name) { throw new Error('Animation without name!');  }
       else if (arguments.length === 1) { // setting current animation
         frame = delay = 0;
         current = animations[name];
 
         if (!current) { throw new Error('No animation with name "' + name + '"') }
+
+		this.x = this.x + current.offsetX;
+		this.y = this.y + current.offsetY;
 
         this.element.style.width  = current.width.toString() + 'px' || 'auto';
         this.element.style.height = current.height.toString() + 'px' || 'auto';
@@ -39,12 +71,16 @@
         return this;
       }
 
+	  var o = options;
+
 	  for (var key in o) {
         if (!contains(ANIMATION_OPTIONS_ALLOWED, key)) { throw new Error('Key not allowed!'); }
       }
 
-      o.x = o.x || 0;
-      o.y = o.y || 0;	 
+	  o.name = name;
+
+	  var dimensions = ['x', 'y', 'offsetX', 'offsetY'];
+	  dimensions.forEach(function (d) { o[d] = o[d] || 0; });
 
       if (!o.width) { throw new Error('Animation without width!'); }
 
@@ -54,7 +90,7 @@
 
 	  while (o.delays.length < o.length) { o.delays.push(0); }
 
-	  if (new Array(o.x, o.y, o.width, o.height, o.length).every(isInt) === false) {
+	  if (new Array(o.x, o.y, o.width, o.height, o.length, o.offsetX, o.offsetY).every(isInt) === false) {
 	    throw new Error('Animation dimensions should be integers!');
 	  }
 
@@ -86,9 +122,9 @@
     return this;
   }
 
-  var STEP = 40,
-      VELOCITY_STEP = .2;
-      VELOCITY_MAX = 2;
+  var STEP = 80,
+      VELOCITY_STEP = .4;
+      VELOCITY_MAX = 3;
 
   var position = 0,
       velocity = 0;
@@ -148,7 +184,9 @@
     return array;
   }
 
-  var hero = new Spritesheet('hero').animation('idle', { width: 32, height: 160, length: 2, delays: [10, 10] });
+  var hero = new Spritesheet('hero')
+  .animation('walk', { x: 32, width: 68, height: 144, length: 16 })
+  .animation('idle', { width: 32, height: 144 });
 
   stage.appendChild(hero.element);
 
@@ -163,16 +201,16 @@
   }
 
   function nextFrame() {
-    hero.next();
-
     var action = pressed[0];
 
     switch (action) {
       case 'right':
-        velocity += VELOCITY_STEP;
+        velocity -= VELOCITY_STEP;
+		if (hero.isFlipped()) { hero.flip(); }
         break;
       case 'left':
-        velocity -= VELOCITY_STEP;
+        velocity += VELOCITY_STEP;
+		if (!hero.isFlipped()) { hero.flip(); }
         break;
       default:
         velocity *= .8;
@@ -180,9 +218,15 @@
         break;
     }
 
+
     velocity = Math.min(VELOCITY_MAX, Math.abs(velocity)) * (Math.abs(velocity) / velocity);
     velocity = velocity || 0;
     position += velocity;
+
+	if (Math.abs(velocity) < 1 && hero.animation() === 'walk') { hero.animation('idle'); }
+	if (Math.abs(velocity) >= 1 && hero.animation() === 'idle') { hero.animation('walk'); }
+
+	hero.next();
 
     updateView();
   }
