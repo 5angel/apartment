@@ -23,6 +23,11 @@ function contains(array) {
   return args.every(function (item) { return array.indexOf(item) !== -1; });
 }
 (function () {
+  // define sprites
+  var hero = new Spritesheet('hero')
+  .animation('walk', { x: 74, width: 74, height: 144, length: 16 })
+  .animation('idle', { width: 74, height: 144 });
+
   var STEP = 80,
       VELOCITY_STEP = .4;
       VELOCITY_MAX = 3;
@@ -84,10 +89,6 @@ function contains(array) {
 
     return array;
   }
-
-  var hero = new Spritesheet('hero')
-  .animation('walk', { x: 32, width: 68, height: 144, length: 16 })
-  .animation('idle', { width: 32, height: 144 });
 
   stage.appendChild(hero.element);
 
