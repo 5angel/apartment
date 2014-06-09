@@ -9,10 +9,10 @@ module.exports = function(grunt) {
     },
 	copy: {
       files: {
-        cwd: 'src/i/',  // set working folder / root to copy
-        src: '**/*',           // copy all files and subfolders
-        dest: 'dist/i',    // destination folder
-        expand: true           // required when using cwd
+        cwd: 'src/i/',
+        src: '**/*',
+        dest: 'dist/i',
+        expand: true
       }
 	},
     concat: {
