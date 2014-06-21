@@ -1,18 +1,26 @@
-function Room(name, type, depth) {
-  var TYPE_BASE = 'base';
+function Room(name, type, width, depth) {
+  var TYPE_DEFAULT  = 'base',
+      WIDTH_DEFAULT = 320;
 
-  if (!isValidString(name)) { throw new Error('Room without a name!'); }
+  if (!isValidString(name)) { throw new Error('Room without a name!') }
 
-  type  = type || TYPE_BASE;
+  type  = type || TYPE_DEFAULT;
+  width = width || WIDTH_DEFAULT;
   depth = depth || 1;
 
-  if (!isValidString(type)) { throw new Error('Room with invalid type of "' + type + '"!'); }
-  if (!isInt(depth)) { throw new Error('Room with invalid depth of "' + depth + '"!'); }
+  if (!isValidString(type)) { throw new Error('Room with invalid type of "' + type + '"!') }
+  if (!isInt(width)) { throw new Error('Room with invalid width of "' + width + '"!') }
+  if (!isInt(depth)) { throw new Error('Room with invalid depth of "' + depth + '"!') }
 
-  this.getName = function () { return name; };
+  width = Math.min(WIDTH_DEFAULT, width);
+
+  var tiles = [];
+
+  this.getName = function () { return name };
+  this.getWidth = function () { return width };
 
   this.getTiles = function () {
-    var array = [];
+    if (tiles.length > 0) { return tiles }
 
     for (var i = 0; i < depth; ++i) {
       var t = div(),
@@ -21,9 +29,9 @@ function Room(name, type, depth) {
       t.style.backgroundImage = 'url(\'dist/i/tiles/' + type + '.png\')';
 
       t.setAttribute('class', 'background__tile');
-      array.push(t);
+      tiles.push(t);
 	}
-	
-    return array;
+
+    return tiles;
   };
 }

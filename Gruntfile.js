@@ -1,6 +1,6 @@
 module.exports = function(grunt) {
   var SOURCE = 'src/js/',
-      NAMES  = ['common', 'spritesheet', 'room', 'main'],
+      NAMES  = ['common', 'sprite', 'room', 'main'],
 	  FILES  = NAMES.map(function (name) { return SOURCE + name + '.js'});
 
   // configure the tasks
