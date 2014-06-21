@@ -35,40 +35,28 @@
       background = div();
 
   document.body.appendChild(screen);
+
   screen.setAttribute('id', 'screen');
   screen.setAttribute('tabindex', 0);
   screen.appendChild(stage);
   screen.appendChild(background);
   screen.addEventListener('keydown', onKeyDown);
   screen.addEventListener('keyup', onKeyUp);
+
   stage.setAttribute('class', 'stage');
+  stage.appendChild(hero.getElement());
+
   background.setAttribute('class', 'background');
 
-  function addTiles(types) {
-    types = types || ['base'];
+  var tiles;
+  
+  function renderLevel(room) {
+    tiles = room.getTiles();
 
-    var array = [];
-
-    if (isArray(types)) {
-      types.forEach(function (value) {
-        var t = div();
-
-        if (typeof value !== 'string') { value = value.toString(); }
-
-        t.style.backgroundImage = 'url(\'dist/i/tiles/' + value + '.png\')';
-
-        t.setAttribute('class', 'background__tile');
-        array.push(t);
-        background.appendChild(t);
-      });
-    } else { throw new Error('Not an array'); }
-
-    return array;
+    tiles.forEach(function (t) {
+	  background.appendChild(t);
+	});
   }
-
-  stage.appendChild(hero.element);
-
-  var tiles = addTiles();
 
   function updateView() {
     tiles.forEach(function (t, i) {
@@ -108,6 +96,8 @@
 
     updateView();
   }
+
+  renderLevel(new Room('blank'));
 
   setInterval(nextFrame, STEP);
 })();

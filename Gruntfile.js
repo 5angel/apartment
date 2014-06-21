@@ -1,4 +1,8 @@
 module.exports = function(grunt) {
+  var SOURCE = 'src/js/',
+      NAMES  = ['common', 'spritesheet', 'room', 'main'],
+	  FILES  = NAMES.map(function (name) { return SOURCE + name + '.js'});
+
   // configure the tasks
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
@@ -17,7 +21,7 @@ module.exports = function(grunt) {
 	},
     concat: {
       dist: {
-        src: ['src/js/*.js'],
+        src: FILES,
         dest: 'dist/js/app.js',
       },
     },

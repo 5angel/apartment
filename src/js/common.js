@@ -14,7 +14,11 @@ function removeClassFrom(name, el) {
 }
 
 function isArray(obj) { return Object.prototype.toString.call(obj) === '[object Array]'; }
+
 function isInt(n) { return typeof n === 'number' && n % 1 == 0; }
+
+function isValidString(str) { return typeof str === 'string' && str !== ''; }
+
 function div() { return document.createElement('div'); }
 
 function contains(array) {
