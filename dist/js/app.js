@@ -165,17 +165,21 @@ function SpriteSheet(name) {
 
   this.next = function () {
     delay++;
-    if (delay < current.delays[frame]) { return this }
+    if (delay < current.delays[frame]) { return delay + 1 >= current.delays[frame] && frame + 1 >= current.length }
     else { delay = 0 }
 
     frame++;
-    if (frame >= current.length) { frame = 0 }	  
+
+    if (frame >= current.length) { frame = 0 }
+
     var pos = (current.x + (frame * current.width)) * 2;
 
     element.style.backgroundPosition = -pos.toString() + 'px ' + -current.y.toString() + 'px';
+
+	return last;
   };
 
-  return this;
+  return false;
 }
 function GameObject(sprite, velocity, scroll) {
   if (sprite instanceof SpriteSheet === false) { throw new Error('Please provide a sprite!') }
