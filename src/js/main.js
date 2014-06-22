@@ -72,7 +72,8 @@
 
   function nextFrame() {
     var action = pressed[0],
-	    sprite = activeObject.getSprite();
+	    sprite = activeObject.getSprite(),
+		scroll = activeObject.getScroll();
 
 	var position   = sprite.position(),
 		dimensions = sprite.dimensions();
@@ -91,6 +92,7 @@
 
 	position.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
 
+	// TODO: move position logic to GameObject
 	if (currentRoom.getWidth() === STAGE_WIDTH) {
 	  position.x -= activeObject.getVelocity();
 	} else {
@@ -119,7 +121,7 @@
     placeBackground();
   }
 
-  loadLevel(new Room('blank'), [new GameObject(SPRITES.hero)]);
+  loadLevel(new Room('blank', null, 640), [new GameObject(SPRITES.hero)]);
 
   setInterval(nextFrame, FRAME_STEP);
 })();

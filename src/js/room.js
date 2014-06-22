@@ -4,7 +4,7 @@ function Room(name, type, width, depth) {
 
   if (!isValidString(name)) { throw new Error('Room without a name!') }
 
-  type  = type || TYPE_DEFAULT;
+  type  = type  || TYPE_DEFAULT;
   width = width || WIDTH_DEFAULT;
   depth = depth || 1;
 
