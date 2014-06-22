@@ -1,5 +1,5 @@
-function Sprite(name) {
-  if (!isValidString(name)) { throw new Error('Sprite without a name!');  }
+function SpriteSheet(name) {
+  if (!isValidString(name)) { throw new Error('SpriteSheet without a name!');  }
 
   var CLASS_FLIPPED = 'stage__sprite_style_flipped',
       ANIMATION_OPTIONS_ALLOWED = ['x', 'y', 'width', 'height', 'length', 'delays', 'offsetX', 'offsetY'];;
@@ -11,8 +11,8 @@ function Sprite(name) {
   var x = 0,
       y = 0;
 
-  var velocity = 0;
   var element = div();
+  
   var _dimensions;
 
   element.style.backgroundImage = 'url(\'dist/i/sprites/' + name + '.png\')';
@@ -42,13 +42,6 @@ function Sprite(name) {
 	  element.style.top = Math.floor(ny).toString() + 'px';
 	}
   };
-
-  this.velocity = function (value) {
-    if (!arguments.length) { return velocity }
-    if (!isNumber(value)) { throw new Error('Velocity with invalid value of "' + value + '"!') }
-
-	velocity = value;
-  }
 
   var that = this;  
 

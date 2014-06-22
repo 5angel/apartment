@@ -1,6 +1,5 @@
 (function () {
   var FRAME_STEP    = 80,
-      FRICTION      = .6,
       VELOCITY_STEP = .4,
       VELOCITY_MAX  = 3,
 	  STAGE_WIDTH   = 320,
@@ -10,11 +9,9 @@
   // define sprites
   var SPRITES = {};
 
-  SPRITES.hero = new Sprite('hero')
+  SPRITES.hero = new SpriteSheet('hero')
   .animation('walk', { x: 37, width: 37, height: 72, length: 16 })
   .animation('idle', { width: 37, height: 72 });
-
-  var focus = SPRITES.hero;
 
   var pressed = [],
       sprites = [];
@@ -53,10 +50,10 @@
 
   background.setAttribute('class', 'background');
  
-  var currentRoom;
+  var currentRoom, activeObject;
 
   function placeSprites() {
-    stage.appendChild(focus.getElement());
+    stage.appendChild(activeObject.getSprite().getElement());
   };
 
   function placeBackground() { currentRoom.getTiles().forEach(function (t) { background.appendChild(t) }) }
@@ -66,7 +63,7 @@
       var tiles = currentRoom.getTiles();
 
       tiles.forEach(function (t, i) {
-        var p = Math.floor(focus.position() / (tiles.length - i)) * 2;
+        var p = Math.floor(activeObject.getScroll() / (tiles.length - i)) * 2;
 
         t.style.backgroundPosition = p.toString() + 'px 0px';
       });
@@ -74,56 +71,55 @@
   }
 
   function nextFrame() {
-    var action   = pressed[0];
+    var action = pressed[0],
+	    sprite = activeObject.getSprite();
 
-	var velocity   = focus.velocity(),
-	    position   = focus.position(),
-		dimensions = focus.dimensions();
+	var position   = sprite.position(),
+		dimensions = sprite.dimensions();
 
     switch (action) {
       case 'right':
-        velocity -= VELOCITY_STEP;
-		if (focus.isFlipped()) { focus.flip() }
+        activeObject.pushRight();
         break;
       case 'left':
-        velocity += VELOCITY_STEP;
-		if (!focus.isFlipped()) { focus.flip() }
+        activeObject.pushLeft();
         break;
       default:
-        velocity *= FRICTION;
-        if (Math.abs(velocity) < .1) { velocity = 0 }
+        activeObject.wait();
         break;
     }
-
-    velocity = Math.min(VELOCITY_MAX, Math.abs(velocity)) * (Math.abs(velocity) / velocity);
-    velocity = velocity || 0;
-
-	if (Math.abs(velocity) < 1 && focus.animation() === 'walk') { focus.animation('idle') }
-	if (Math.abs(velocity) >= 1 && focus.animation() === 'idle') { focus.animation('walk') }
 
 	position.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
 
 	if (currentRoom.getWidth() === STAGE_WIDTH) {
-	  position.x -= velocity;
+	  position.x -= activeObject.getVelocity();
 	} else {
 	  position.x = (STAGE_WIDTH / 2) - (dimensions.width / 2);
 	}
 
-	focus.position(position.x, position.y);
-	focus.velocity(velocity);
-	focus.next();
+	sprite.position(position.x, position.y);
+	sprite.next();
 
     updateView();
   }
 
-  function loadLevel(room) {
-    currentRoom = room;
+  function loadLevel(room, objects) {
+    if (room instanceof Room === false ) { throw new Error('Please provide a room!') }
+
+	var o = objects;
+
+    if (!isArray(o) || (isArray(o) && (o.length === 0 && !o.every(function (t) { return t instanceof GameObject })))) {
+      throw new Error('Please provide a correct array of objects!');
+    }
+
+    currentRoom  = room;
+	activeObject = objects[0];
 
 	placeSprites();
     placeBackground();
   }
 
-  loadLevel(new Room('blank'));
+  loadLevel(new Room('blank'), [new GameObject(SPRITES.hero)]);
 
   setInterval(nextFrame, FRAME_STEP);
 })();

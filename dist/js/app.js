@@ -1,7 +1,8 @@
 Function.prototype.curry = function () {
-  var args = Array.prototype.slice.apply(arguments),
-      that = this;
-  return function () { return that.apply(null, args.concat(Array.prototype.slice.apply(arguments))) };
+  var slice = Array.prototype.slice,
+      args  = slice.apply(arguments),
+      that  = this;
+  return function () { return that.apply(null, args.concat(slice.apply(arguments))) };
 };
 
 function addClassTo(name, el) {
@@ -34,8 +35,8 @@ function contains(array) {
   var args = Array.prototype.slice.call(arguments).slice(1);
   return args.every(function (item) { return array.indexOf(item) !== -1 });
 }
-function Sprite(name) {
-  if (!isValidString(name)) { throw new Error('Sprite without a name!');  }
+function SpriteSheet(name) {
+  if (!isValidString(name)) { throw new Error('SpriteSheet without a name!');  }
 
   var CLASS_FLIPPED = 'stage__sprite_style_flipped',
       ANIMATION_OPTIONS_ALLOWED = ['x', 'y', 'width', 'height', 'length', 'delays', 'offsetX', 'offsetY'];;
@@ -47,8 +48,8 @@ function Sprite(name) {
   var x = 0,
       y = 0;
 
-  var velocity = 0;
   var element = div();
+  
   var _dimensions;
 
   element.style.backgroundImage = 'url(\'dist/i/sprites/' + name + '.png\')';
@@ -78,13 +79,6 @@ function Sprite(name) {
 	  element.style.top = Math.floor(ny).toString() + 'px';
 	}
   };
-
-  this.velocity = function (value) {
-    if (!arguments.length) { return velocity }
-    if (!isNumber(value)) { throw new Error('Velocity with invalid value of "' + value + '"!') }
-
-	velocity = value;
-  }
 
   var that = this;  
 
@@ -183,6 +177,68 @@ function Sprite(name) {
 
   return this;
 }
+function GameObject(sprite, velocity, scroll) {
+  if (sprite instanceof SpriteSheet === false) { throw new Error('Please provide a sprite!') }
+
+  var VELOCITY_OPTIONS_ALLOWED = ['step', 'max'];
+
+  velocity = velocity || {};
+  scroll   = scroll   || 0;
+
+  for (var key in velocity) {
+    if (!contains(VELOCITY_OPTIONS_ALLOWED, key)) { throw new Error('Key "' + key + '" is not allowed!') }
+  }
+
+  var FRICTION = .6;
+  var VELOCITY_STEP_DEFAULT = .4,
+      VELOCITY_MAX_DEFAULT  = 3;
+
+  velocity.step  = velocity.step || VELOCITY_STEP_DEFAULT;
+  velocity.max   = velocity.max  || VELOCITY_MAX_DEFAULT;
+
+  if (!isNumber(scroll)) { throw new Error('GameObject with invalid starting scroll!') }
+  else if (scroll < 0) { throw new Error('GameObject scroll cannot be lower than 0!') }
+
+  if (!isNumber(velocity.step) || !isNumber(velocity.max)) { throw new Error('GameObject with invalid velocity data!') }
+
+  var v = 0;
+
+  function push(k, value) {
+    k = k || 1;
+    value = value || velocity.step;
+
+    if (!isNumber(value)) { throw new Error('Push with invalid value of "' + value.toString() + '"!') }
+
+	value *= k;
+	v += value;
+
+	if ((k < 0 && sprite.isFlipped()) || (k > 0 && !sprite.isFlipped())) { sprite.flip() }
+
+	correct();
+  }
+
+  function correct() {
+    v = Math.min(velocity.max, Math.abs(v)) * (Math.abs(v) / (v || 1));
+
+	if (Math.abs(v) <  1 && sprite.animation() === 'walk') { sprite.animation('idle') }
+	if (Math.abs(v) >= 1 && sprite.animation() === 'idle') { sprite.animation('walk') }
+  }
+  
+  this.getSprite   = function () { return sprite };
+  this.getScroll   = function () { return scroll };
+  this.getVelocity = function () { return v };
+
+  this.pushLeft  = push.curry();
+  this.pushRight = push.curry(-1);
+
+  this.wait = function () {
+    v *= FRICTION;
+
+    if (Math.abs(v) < .1) { v = 0 }
+
+	correct();
+  };
+}
 function Room(name, type, width, depth) {
   var TYPE_DEFAULT  = 'base',
       WIDTH_DEFAULT = 320;
@@ -222,7 +278,6 @@ function Room(name, type, width, depth) {
 }
 (function () {
   var FRAME_STEP    = 80,
-      FRICTION      = .6,
       VELOCITY_STEP = .4,
       VELOCITY_MAX  = 3,
 	  STAGE_WIDTH   = 320,
@@ -232,11 +287,9 @@ function Room(name, type, width, depth) {
   // define sprites
   var SPRITES = {};
 
-  SPRITES.hero = new Sprite('hero')
+  SPRITES.hero = new SpriteSheet('hero')
   .animation('walk', { x: 37, width: 37, height: 72, length: 16 })
   .animation('idle', { width: 37, height: 72 });
-
-  var focus = SPRITES.hero;
 
   var pressed = [],
       sprites = [];
@@ -275,10 +328,10 @@ function Room(name, type, width, depth) {
 
   background.setAttribute('class', 'background');
  
-  var currentRoom;
+  var currentRoom, activeObject;
 
   function placeSprites() {
-    stage.appendChild(focus.getElement());
+    stage.appendChild(activeObject.getSprite().getElement());
   };
 
   function placeBackground() { currentRoom.getTiles().forEach(function (t) { background.appendChild(t) }) }
@@ -288,7 +341,7 @@ function Room(name, type, width, depth) {
       var tiles = currentRoom.getTiles();
 
       tiles.forEach(function (t, i) {
-        var p = Math.floor(focus.position() / (tiles.length - i)) * 2;
+        var p = Math.floor(activeObject.getScroll() / (tiles.length - i)) * 2;
 
         t.style.backgroundPosition = p.toString() + 'px 0px';
       });
@@ -296,56 +349,55 @@ function Room(name, type, width, depth) {
   }
 
   function nextFrame() {
-    var action   = pressed[0];
+    var action = pressed[0],
+	    sprite = activeObject.getSprite();
 
-	var velocity   = focus.velocity(),
-	    position   = focus.position(),
-		dimensions = focus.dimensions();
+	var position   = sprite.position(),
+		dimensions = sprite.dimensions();
 
     switch (action) {
       case 'right':
-        velocity -= VELOCITY_STEP;
-		if (focus.isFlipped()) { focus.flip() }
+        activeObject.pushRight();
         break;
       case 'left':
-        velocity += VELOCITY_STEP;
-		if (!focus.isFlipped()) { focus.flip() }
+        activeObject.pushLeft();
         break;
       default:
-        velocity *= FRICTION;
-        if (Math.abs(velocity) < .1) { velocity = 0 }
+        activeObject.wait();
         break;
     }
-
-    velocity = Math.min(VELOCITY_MAX, Math.abs(velocity)) * (Math.abs(velocity) / velocity);
-    velocity = velocity || 0;
-
-	if (Math.abs(velocity) < 1 && focus.animation() === 'walk') { focus.animation('idle') }
-	if (Math.abs(velocity) >= 1 && focus.animation() === 'idle') { focus.animation('walk') }
 
 	position.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
 
 	if (currentRoom.getWidth() === STAGE_WIDTH) {
-	  position.x -= velocity;
+	  position.x -= activeObject.getVelocity();
 	} else {
 	  position.x = (STAGE_WIDTH / 2) - (dimensions.width / 2);
 	}
 
-	focus.position(position.x, position.y);
-	focus.velocity(velocity);
-	focus.next();
+	sprite.position(position.x, position.y);
+	sprite.next();
 
     updateView();
   }
 
-  function loadLevel(room) {
-    currentRoom = room;
+  function loadLevel(room, objects) {
+    if (room instanceof Room === false ) { throw new Error('Please provide a room!') }
+
+	var o = objects;
+
+    if (!isArray(o) || (isArray(o) && (o.length === 0 && !o.every(function (t) { return t instanceof GameObject })))) {
+      throw new Error('Please provide a correct array of objects!');
+    }
+
+    currentRoom  = room;
+	activeObject = objects[0];
 
 	placeSprites();
     placeBackground();
   }
 
-  loadLevel(new Room('blank'));
+  loadLevel(new Room('blank'), [new GameObject(SPRITES.hero)]);
 
   setInterval(nextFrame, FRAME_STEP);
 })();

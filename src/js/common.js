@@ -1,7 +1,8 @@
 Function.prototype.curry = function () {
-  var args = Array.prototype.slice.apply(arguments),
-      that = this;
-  return function () { return that.apply(null, args.concat(Array.prototype.slice.apply(arguments))) };
+  var slice = Array.prototype.slice,
+      args  = slice.apply(arguments),
+      that  = this;
+  return function () { return that.apply(null, args.concat(slice.apply(arguments))) };
 };
 
 function addClassTo(name, el) {
