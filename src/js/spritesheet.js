@@ -139,7 +139,7 @@ function SpriteSheet(name) {
 
     element.style.backgroundPosition = -pos.toString() + 'px ' + -current.y.toString() + 'px';
 
-	return last;
+	return false;
   };
 
   return false;

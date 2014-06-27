@@ -176,7 +176,7 @@ function SpriteSheet(name) {
 
     element.style.backgroundPosition = -pos.toString() + 'px ' + -current.y.toString() + 'px';
 
-	return last;
+	return false;
   };
 
   return false;
@@ -207,7 +207,7 @@ function GameObject(sprite, vstep, vmax, scroll) {
 	value *= k;
 	velocity += value;
 	velocity = Math.min(vmax, Math.abs(velocity)) * (Math.abs(velocity) / (velocity || 1));
-	scroll += velocity;
+	scroll -= velocity;
 
 	if ((k < 0 && sprite.isFlipped()) || (k > 0 && !sprite.isFlipped())) { sprite.flip() }
 
@@ -231,7 +231,7 @@ function GameObject(sprite, vstep, vmax, scroll) {
 
     if (Math.abs(velocity) < .1) { velocity = 0 }
 
-	scroll += velocity;
+	scroll -= velocity;
 
 	correctAnimation();
   };
@@ -242,7 +242,7 @@ function Room(name, type, width, depth) {
 
   if (!isValidString(name)) { throw new Error('Room without a name!') }
 
-  type  = type || TYPE_DEFAULT;
+  type  = type  || TYPE_DEFAULT;
   width = width || WIDTH_DEFAULT;
   depth = depth || 1;
 
@@ -250,7 +250,7 @@ function Room(name, type, width, depth) {
   if (!isInt(width)) { throw new Error('Room with invalid width of "' + width + '"!') }
   if (!isInt(depth)) { throw new Error('Room with invalid depth of "' + depth + '"!') }
 
-  width = Math.min(WIDTH_DEFAULT, width);
+  width = Math.max(WIDTH_DEFAULT, width);
 
   var tiles = [];
 
@@ -333,22 +333,26 @@ function Room(name, type, width, depth) {
 
   function placeBackground() { currentRoom.getTiles().forEach(function (t) { background.appendChild(t) }) }
 
-  function updateView() {
-    if (currentRoom.getWidth() > STAGE_WIDTH) {
-      var tiles = currentRoom.getTiles();
+  function updateView(scroll, width, delta) {
+    var tiles  = currentRoom.getTiles();
 
-      tiles.forEach(function (t, i) {
-        var p = Math.floor(activeObject.getScroll() / (tiles.length - i)) * 2;
+	var x = 0;
+	
+	if (scroll + delta >= width) { x = width - (delta * 2) }
+	else if (scroll >= delta) { x = scroll - delta }
 
-        t.style.backgroundPosition = p.toString() + 'px 0px';
-      });
-	}
+    tiles.forEach(function (t, i) {
+      var p = -Math.floor(x / (tiles.length - i)) * 2;
+
+      t.style.backgroundPosition = p.toString() + 'px 0px';;
+	});
   }
 
   function nextFrame() {
     var action = pressed[0],
 	    sprite = activeObject.getSprite(),
-		scroll = activeObject.getScroll();
+		scroll = activeObject.getScroll(),
+		width  = currentRoom.getWidth();
 
 	var position   = sprite.position(),
 		dimensions = sprite.dimensions();
@@ -368,16 +372,21 @@ function Room(name, type, width, depth) {
 	position.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
 
 	// TODO: move position logic to GameObject
-	if (currentRoom.getWidth() === STAGE_WIDTH) {
-	  position.x -= activeObject.getVelocity();
+
+	var delta = (STAGE_WIDTH / 2) - (dimensions.width / 2);
+	var toLeft  = scroll < delta,
+	    toRight = scroll + delta >= width;
+
+	if (!toLeft && !toRight) {
+	  position.x = delta;
 	} else {
-	  position.x = (STAGE_WIDTH / 2) - (dimensions.width / 2);
+	  position.x = toRight ? scroll - width + STAGE_WIDTH - dimensions.width : scroll;
 	}
+	
+	updateView(scroll, width, delta);
 
 	sprite.position(position.x, position.y);
 	sprite.next();
-
-    updateView();
   }
 
   function loadLevel(room, objects) {
@@ -396,7 +405,7 @@ function Room(name, type, width, depth) {
     placeBackground();
   }
 
-  loadLevel(new Room('blank', null, 640), [new GameObject(SPRITES.hero)]);
+  loadLevel(new Room('blank', null, 420), [new GameObject(SPRITES.hero)]);
 
   setInterval(nextFrame, FRAME_STEP);
 })();

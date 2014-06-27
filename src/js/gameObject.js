@@ -24,7 +24,7 @@ function GameObject(sprite, vstep, vmax, scroll) {
 	value *= k;
 	velocity += value;
 	velocity = Math.min(vmax, Math.abs(velocity)) * (Math.abs(velocity) / (velocity || 1));
-	scroll += velocity;
+	scroll -= velocity;
 
 	if ((k < 0 && sprite.isFlipped()) || (k > 0 && !sprite.isFlipped())) { sprite.flip() }
 
@@ -48,7 +48,7 @@ function GameObject(sprite, vstep, vmax, scroll) {
 
     if (Math.abs(velocity) < .1) { velocity = 0 }
 
-	scroll += velocity;
+	scroll -= velocity;
 
 	correctAnimation();
   };

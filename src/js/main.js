@@ -58,22 +58,26 @@
 
   function placeBackground() { currentRoom.getTiles().forEach(function (t) { background.appendChild(t) }) }
 
-  function updateView() {
-    if (currentRoom.getWidth() > STAGE_WIDTH) {
-      var tiles = currentRoom.getTiles();
+  function updateView(scroll, width, delta) {
+    var tiles  = currentRoom.getTiles();
 
-      tiles.forEach(function (t, i) {
-        var p = Math.floor(activeObject.getScroll() / (tiles.length - i)) * 2;
+	var x = 0;
+	
+	if (scroll + delta >= width) { x = width - (delta * 2) }
+	else if (scroll >= delta) { x = scroll - delta }
 
-        t.style.backgroundPosition = p.toString() + 'px 0px';
-      });
-	}
+    tiles.forEach(function (t, i) {
+      var p = -Math.floor(x / (tiles.length - i)) * 2;
+
+      t.style.backgroundPosition = p.toString() + 'px 0px';;
+	});
   }
 
   function nextFrame() {
     var action = pressed[0],
 	    sprite = activeObject.getSprite(),
-		scroll = activeObject.getScroll();
+		scroll = activeObject.getScroll(),
+		width  = currentRoom.getWidth();
 
 	var position   = sprite.position(),
 		dimensions = sprite.dimensions();
@@ -93,16 +97,21 @@
 	position.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
 
 	// TODO: move position logic to GameObject
-	if (currentRoom.getWidth() === STAGE_WIDTH) {
-	  position.x -= activeObject.getVelocity();
+
+	var delta = (STAGE_WIDTH / 2) - (dimensions.width / 2);
+	var toLeft  = scroll < delta,
+	    toRight = scroll + delta >= width;
+
+	if (!toLeft && !toRight) {
+	  position.x = delta;
 	} else {
-	  position.x = (STAGE_WIDTH / 2) - (dimensions.width / 2);
+	  position.x = toRight ? scroll - width + STAGE_WIDTH - dimensions.width : scroll;
 	}
+	
+	updateView(scroll, width, delta);
 
 	sprite.position(position.x, position.y);
 	sprite.next();
-
-    updateView();
   }
 
   function loadLevel(room, objects) {
@@ -121,7 +130,7 @@
     placeBackground();
   }
 
-  loadLevel(new Room('blank', null, 640), [new GameObject(SPRITES.hero)]);
+  loadLevel(new Room('blank', null, 420), [new GameObject(SPRITES.hero)]);
 
   setInterval(nextFrame, FRAME_STEP);
 })();

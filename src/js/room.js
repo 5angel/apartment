@@ -12,7 +12,7 @@ function Room(name, type, width, depth) {
   if (!isInt(width)) { throw new Error('Room with invalid width of "' + width + '"!') }
   if (!isInt(depth)) { throw new Error('Room with invalid depth of "' + depth + '"!') }
 
-  width = Math.min(WIDTH_DEFAULT, width);
+  width = Math.max(WIDTH_DEFAULT, width);
 
   var tiles = [];
 
