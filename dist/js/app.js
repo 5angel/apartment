@@ -62,8 +62,8 @@ function SpriteSheet(name) {
   this.position = function (nx, ny) {
     if (!arguments.length) { return { x: x, y: y } }
 
-    nx = nx || x;
-	ny = ny || y;
+    nx = nx === 0 ? 0 : nx || x;
+	ny = ny === 0 ? 0 : ny || y;
 
 	if (!isNumber(nx) || !isNumber(ny)) { throw new Error('Invalid coordinates!') }
 
@@ -181,21 +181,25 @@ function SpriteSheet(name) {
 
   return false;
 }
-function GameObject(sprite, vstep, vmax, scroll) {
+function GameObject(sprite, vstep, vmax, scroll, bound) {
   if (sprite instanceof SpriteSheet === false) { throw new Error('Please provide a sprite!') }
 
   var FRICTION = .6;
   var VELOCITY_STEP_DEFAULT = .4,
       VELOCITY_MAX_DEFAULT  = 3;
+  var BOUND_MAX = 9007199254740992;
 
-  vstep  = vstep || VELOCITY_STEP_DEFAULT;
-  vmax   = vmax  || VELOCITY_MAX_DEFAULT;
+  vstep  = vstep  || VELOCITY_STEP_DEFAULT;
+  vmax   = vmax   || VELOCITY_MAX_DEFAULT;
   scroll = scroll || 0;
+  bound  = bound  || BOUND_MAX;
+
 
   if (!isNumber(scroll)) { throw new Error('GameObject with invalid starting scroll!') }
   else if (scroll < 0) { throw new Error('GameObject scroll cannot be lower than 0!') }
   if (!isNumber(vstep) || !isNumber(vmax)) { throw new Error('GameObject with invalid velocity data!') }
-
+  if (!isInt(bound)) { throw new Error('GameObject with invalid bound!') }
+  
   var velocity = 0;
 
   function push(k, value) {
@@ -211,7 +215,15 @@ function GameObject(sprite, vstep, vmax, scroll) {
 
 	if ((k < 0 && sprite.isFlipped()) || (k > 0 && !sprite.isFlipped())) { sprite.flip() }
 
+	correctPosition();
 	correctAnimation();
+  }
+
+  function correctPosition() {
+    if (scroll < 0 || scroll > bound) {
+	  scroll = Math.min(bound, Math.max(0, scroll));
+	  velocity = 0;
+	}
   }
 
   function correctAnimation() {
@@ -222,6 +234,12 @@ function GameObject(sprite, vstep, vmax, scroll) {
   this.getSprite   = function () { return sprite };
   this.getScroll   = function () { return scroll };
   this.getVelocity = function () { return velocity };
+
+  this.setBound = function (value) {
+    if (!isInt(bound)) { throw new Error('Bound should be integer!') }
+
+	bound = value;
+  };
 
   this.pushLeft  = push.curry();
   this.pushRight = push.curry(-1);
@@ -349,13 +367,7 @@ function Room(name, type, width, depth) {
   }
 
   function nextFrame() {
-    var action = pressed[0],
-	    sprite = activeObject.getSprite(),
-		scroll = activeObject.getScroll(),
-		width  = currentRoom.getWidth();
-
-	var position   = sprite.position(),
-		dimensions = sprite.dimensions();
+    var action = pressed[0];
 
     switch (action) {
       case 'right':
@@ -368,6 +380,13 @@ function Room(name, type, width, depth) {
         activeObject.wait();
         break;
     }
+
+	var sprite = activeObject.getSprite(),
+		scroll = activeObject.getScroll(),
+		width  = currentRoom.getWidth();
+
+	var position   = sprite.position(),
+		dimensions = sprite.dimensions();
 
 	position.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
 
@@ -385,8 +404,8 @@ function Room(name, type, width, depth) {
 	
 	updateView(scroll, width, delta);
 
-	sprite.position(position.x, position.y);
 	sprite.next();
+	sprite.position(position.x, position.y);
   }
 
   function loadLevel(room, objects) {
@@ -397,6 +416,10 @@ function Room(name, type, width, depth) {
     if (!isArray(o) || (isArray(o) && (o.length === 0 && !o.every(function (t) { return t instanceof GameObject })))) {
       throw new Error('Please provide a correct array of objects!');
     }
+
+	objects.forEach(function (obj) {
+	  obj.setBound(room.getWidth());
+	});
 
     currentRoom  = room;
 	activeObject = objects[0];

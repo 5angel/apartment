@@ -74,13 +74,7 @@
   }
 
   function nextFrame() {
-    var action = pressed[0],
-	    sprite = activeObject.getSprite(),
-		scroll = activeObject.getScroll(),
-		width  = currentRoom.getWidth();
-
-	var position   = sprite.position(),
-		dimensions = sprite.dimensions();
+    var action = pressed[0];
 
     switch (action) {
       case 'right':
@@ -93,6 +87,13 @@
         activeObject.wait();
         break;
     }
+
+	var sprite = activeObject.getSprite(),
+		scroll = activeObject.getScroll(),
+		width  = currentRoom.getWidth();
+
+	var position   = sprite.position(),
+		dimensions = sprite.dimensions();
 
 	position.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
 
@@ -110,8 +111,8 @@
 	
 	updateView(scroll, width, delta);
 
-	sprite.position(position.x, position.y);
 	sprite.next();
+	sprite.position(position.x, position.y);
   }
 
   function loadLevel(room, objects) {
@@ -122,6 +123,10 @@
     if (!isArray(o) || (isArray(o) && (o.length === 0 && !o.every(function (t) { return t instanceof GameObject })))) {
       throw new Error('Please provide a correct array of objects!');
     }
+
+	objects.forEach(function (obj) {
+	  obj.setBound(room.getWidth());
+	});
 
     currentRoom  = room;
 	activeObject = objects[0];

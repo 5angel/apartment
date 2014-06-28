@@ -25,8 +25,8 @@ function SpriteSheet(name) {
   this.position = function (nx, ny) {
     if (!arguments.length) { return { x: x, y: y } }
 
-    nx = nx || x;
-	ny = ny || y;
+    nx = nx === 0 ? 0 : nx || x;
+	ny = ny === 0 ? 0 : ny || y;
 
 	if (!isNumber(nx) || !isNumber(ny)) { throw new Error('Invalid coordinates!') }
 
