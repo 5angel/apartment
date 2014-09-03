@@ -35,19 +35,19 @@ module.exports = function(grunt) {
     less: {
       development: {
         options: {
-          paths: ["assets/css"]
+          paths: ['assets/css']
         },
         files: {
-          "dist/css/styles.css": "src/less/styles.less"
+          'dist/css/styles.css': 'src/less/styles.less'
         }
       },
       production: {
         options: {
-          paths: ["assets/css"],
+          paths: ['assets/css'],
           cleancss: true
         },
         files: {
-          "dist/css/styles.min.css": "src/less/styles.less"
+          'dist/css/styles.min.css': 'src/less/styles.less'
         }
       }
     }
@@ -61,5 +61,5 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-contrib-less');
  
   // define the tasks
-  grunt.registerTask('build', [ 'clean', 'copy', 'concat', 'uglify', 'less']);
+  grunt.registerTask('default', [ 'clean', 'copy', 'concat', 'uglify', 'less']);
 };

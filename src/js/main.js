@@ -1,10 +1,5 @@
 (function () {
-  var FRAME_STEP    = 80,
-      VELOCITY_STEP = .4,
-      VELOCITY_MAX  = 3,
-	  STAGE_WIDTH   = 320,
-	  STAGE_HEIGHT  = 112,
-	  FLOOR_OFFSET  = 6;
+  var FRAME_STEP = 80;
 
   // define sprites
   var SPRITES = {};
@@ -88,31 +83,13 @@
         break;
     }
 
-	var sprite = activeObject.getSprite(),
-		scroll = activeObject.getScroll(),
+	var scroll = activeObject.getScroll(),
+		delta  = activeObject.getDelta(),
 		width  = currentRoom.getWidth();
 
-	var position   = sprite.position(),
-		dimensions = sprite.dimensions();
-
-	position.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
-
-	// TODO: move position logic to GameObject
-
-	var delta = (STAGE_WIDTH / 2) - (dimensions.width / 2);
-	var toLeft  = scroll < delta,
-	    toRight = scroll + delta >= width;
-
-	if (!toLeft && !toRight) {
-	  position.x = delta;
-	} else {
-	  position.x = toRight ? scroll - width + STAGE_WIDTH - dimensions.width : scroll;
-	}
-	
 	updateView(scroll, width, delta);
 
-	sprite.next();
-	sprite.position(position.x, position.y);
+	activeObject.correctPosition(width);
   }
 
   function loadLevel(room, objects) {

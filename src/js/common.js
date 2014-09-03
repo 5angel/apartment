@@ -1,10 +1,3 @@
-Function.prototype.curry = function () {
-  var slice = Array.prototype.slice,
-      args  = slice.apply(arguments),
-      that  = this;
-  return function () { return that.apply(null, args.concat(slice.apply(arguments))) };
-};
-
 function addClassTo(name, el) {
   var list = el.className.split(/\s+/);
   if (list.indexOf(name) === -1) { list.push(name) }

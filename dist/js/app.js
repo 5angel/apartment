@@ -1,10 +1,3 @@
-Function.prototype.curry = function () {
-  var slice = Array.prototype.slice,
-      args  = slice.apply(arguments),
-      that  = this;
-  return function () { return that.apply(null, args.concat(slice.apply(arguments))) };
-};
-
 function addClassTo(name, el) {
   var list = el.className.split(/\s+/);
   if (list.indexOf(name) === -1) { list.push(name) }
@@ -35,269 +28,399 @@ function contains(array) {
   var args = Array.prototype.slice.call(arguments).slice(1);
   return args.every(function (item) { return array.indexOf(item) !== -1 });
 }
-function SpriteSheet(name) {
-  if (!isValidString(name)) { throw new Error('SpriteSheet without a name!');  }
-
+var SpriteSheet = (function () {
   var CLASS_FLIPPED = 'stage__sprite_style_flipped',
-      ANIMATION_OPTIONS_ALLOWED = ['x', 'y', 'width', 'height', 'length', 'delays', 'offsetX', 'offsetY'];;
+      ANIMATION_OPTIONS_ALLOWED = ['x', 'y', 'width', 'height', 'length', 'delays', 'offsetX', 'offsetY'];
 
-  var animations = {};
-  var flipped = false;
-  var current, frame, delay;
+  function SpriteSheet(name) {
+    if (!isValidString(name)) {
+	  throw new Error('SpriteSheet without a name!');
+	}
 
-  var x = 0,
-      y = 0;
+	var that = this;
 
-  var element = div();
+    var animations = {};
+    var flipped = false;
+    var current, frame, delay;
+
+    var x = 0,
+        y = 0;
+
+    var element = div();
   
-  var _dimensions;
+    var _dimensions;
 
-  element.style.backgroundImage = 'url(\'dist/i/sprites/' + name + '.png\')';
-  element.setAttribute('class', 'stage__sprite');
+    element.style.backgroundImage = 'url(\'dist/i/sprites/' + name + '.png\')';
+    element.setAttribute('class', 'stage__sprite');
 
-  this.getName    = function () { return name }
-  this.getElement = function () { return element }
-  this.isFlipped  = function () { return flipped }
+    this.getName = function () {
+	  return name;
+	};
 
-  this.position = function (nx, ny) {
-    if (!arguments.length) { return { x: x, y: y } }
+    this.getElement = function () {
+	  return element;
+	};
 
-    nx = nx === 0 ? 0 : nx || x;
-	ny = ny === 0 ? 0 : ny || y;
+    this.isFlipped  = function () {
+	  return flipped;
+	};
 
-	if (!isNumber(nx) || !isNumber(ny)) { throw new Error('Invalid coordinates!') }
+    this.position = function (nx, ny) {
+      if (!arguments.length) {
+	    return { x: x, y: y };
+	  }
 
-	if (nx !== x) {
-	  x = nx;
-	  nx *= 2;
-	  element.style.left = Math.floor(nx).toString() + 'px';
-	}
+      nx = nx === 0 ? 0 : nx || x;
+	  ny = ny === 0 ? 0 : ny || y;
 
-	if (ny !== y) {
-	  y = ny;
-	  ny *= 2;
-	  element.style.top = Math.floor(ny).toString() + 'px';
-	}
-  };
+	  if (!isNumber(nx) || !isNumber(ny)) {
+	    throw new Error('Invalid coordinates!');
+	  }
 
-  var that = this;  
+	  if (nx !== x) {
+	    x = nx;
+	    nx *= 2;
+	    element.style.left = Math.floor(nx).toString() + 'px';
+	  }
 
-  this.flip = function () {
-    flipped = !flipped;
-    if (flipped) { addClassTo(CLASS_FLIPPED, element) }
-    else { removeClassFrom(CLASS_FLIPPED, element) }
-    return this;
-  };
+	  if (ny !== y) {
+	    y = ny;
+	    ny *= 2;
+	    element.style.top = Math.floor(ny).toString() + 'px';
+	  }
+    };
 
-  this.dimensions = function (name) {
-    name = name || current.name;
+    this.flip = function () {
+      flipped = !flipped;
 
-    if (!isValidString(name)) { throw new Error('Animation with invalid name!');  }
-	if (_dimensions && _dimensions.name === name) { return _dimensions }
-
-	_dimensions = {};
-
-    var source = animations[name];
-
-	for (var prop in source) {
-	  if (source.hasOwnProperty(prop)) { _dimensions[prop] = source[prop] }
-	}
-
-	return _dimensions;
-  };
-
-  this.animation = function (name, options) {
-    if (!arguments.length) { return current !== undefined ? current.name : null }
-
-    if (!isValidString(name)) { throw new Error('Animation with invalid name!');  }
-    else if (arguments.length === 1) { // setting current animation
-      frame = delay = 0;
-      current = animations[name];
-
-      if (!current) { throw new Error('No animation with a name of "' + name + '"') }
-
-	  var width  = current.width * 2,
-	      height = current.height * 2;
-
-      var px = (current.x + current.offsetX) * 2,
-          py = (current.y + current.offsetY) * 2;
-
-      element.style.width  = width.toString() + 'px' || 'auto';
-      element.style.height = height.toString() + 'px' || 'auto';
-      element.style.backgroundPosition = -px.toString() + 'px ' + -py.toString() + 'px';
+      flipped
+	    ? addClassTo(CLASS_FLIPPED, element)
+	    : removeClassFrom(CLASS_FLIPPED, element);
 
       return this;
-    }
+    };
 
-    var o = options;
+    this.dimensions = function (name) {
+      name = name || current.name;
 
-    for (var key in o) {
-      if (!contains(ANIMATION_OPTIONS_ALLOWED, key)) { throw new Error('Key "' + key + '" is not allowed!') }
-    }
+      if (!isValidString(name)) {
+	    throw new Error('Animation with invalid name!');
+	  }
 
-    o.name = name;
+	  if (_dimensions && _dimensions.name === name) {
+	    return _dimensions;
+	  }
 
-    var dimensions = ['x', 'y', 'offsetX', 'offsetY'];
-    dimensions.forEach(function (d) { o[d] = o[d] || 0 });
+	  _dimensions = {};
 
-    if (!o.width) { throw new Error('Animation without a width!') }
+      var source = animations[name];
 
-    o.height = o.height || width;    
-    o.length = o.length || 1;
-    o.delays = o.delays || [];
+	  for (var prop in source) {
+	    if (source.hasOwnProperty(prop)) {
+		  _dimensions[prop] = source[prop];
+		}
+	  }
 
-    while (o.delays.length < o.length) { o.delays.push(0) }
+	  return _dimensions;
+    };
 
-    if (new Array(o.x, o.y, o.width, o.height, o.length, o.offsetX, o.offsetY).every(isInt) === false) {
-      throw new Error('Animation dimensions should be integers!');
-    }
+    this.animation = function (name, options) {
+      if (!arguments.length) {
+	    return current !== undefined ? current.name : null;
+	  }
 
-    if (!isArray(o.delays) || (isArray(o.delays) && !o.delays.every(isInt))) {
-      throw new Error('Animation delays should be an array of integers!');
-    }
+      if (!isValidString(name)) {
+	    throw new Error('Animation with invalid name!');
+	  } else if (arguments.length === 1) { // setting current animation
+        frame = delay = 0;
+        current = animations[name];
 
-    if (o.delays.length > o.length) { o.delays = o.delays.slice(0, o.length - 1) }
+        if (!current) {
+		  throw new Error('No animation with a name of "' + name + '"');
+		}
 
-    animations[name] = options;
+	    var width  = current.width * 2,
+	        height = current.height * 2;
+
+        var px = (current.x + current.offsetX) * 2,
+            py = (current.y + current.offsetY) * 2;
+
+        element.style.width  = width.toString() + 'px' || 'auto';
+        element.style.height = height.toString() + 'px' || 'auto';
+        element.style.backgroundPosition = -px.toString() + 'px ' + -py.toString() + 'px';
+
+        return this;
+      }
+
+      var o = options;
+
+      for (var key in o) {
+        if (!contains(ANIMATION_OPTIONS_ALLOWED, key)) {
+		  throw new Error('Key "' + key + '" is not allowed!');
+		}
+      }
+
+      o.name = name;
+
+      var dimensions = ['x', 'y', 'offsetX', 'offsetY'];
+
+      dimensions.forEach(function (d) {
+	    o[d] = o[d] || 0;
+	  });
+
+      if (!o.width) {
+	    throw new Error('Animation without a width!');
+	  }
+
+      o.height = o.height || width;    
+      o.length = o.length || 1;
+      o.delays = o.delays || [];
+
+      while (o.delays.length < o.length) {
+	    o.delays.push(0);
+	  }
+
+      if (new Array(o.x, o.y, o.width, o.height, o.length, o.offsetX, o.offsetY).every(isInt) === false) {
+        throw new Error('Animation dimensions should be integers!');
+      }
+
+      if (!isArray(o.delays) || (isArray(o.delays) && !o.delays.every(isInt))) {
+        throw new Error('Animation delays should be an array of integers!');
+      }
+
+      if (o.delays.length > o.length) {
+	    o.delays = o.delays.slice(0, o.length - 1);
+	  }
+
+      animations[name] = options;
     
-    return this.animation(name);
-  };
+      return this.animation(name);
+    };
 
-  this.next = function () {
-    delay++;
-    if (delay < current.delays[frame]) { return delay + 1 >= current.delays[frame] && frame + 1 >= current.length }
-    else { delay = 0 }
+    this.next = function () {
+      delay++;
 
-    frame++;
+      if (delay < current.delays[frame]) {
+	    return delay + 1 >= current.delays[frame] && frame + 1 >= current.length;
+	  } else { delay = 0 }
 
-    if (frame >= current.length) { frame = 0 }
+      frame++;
 
-    var pos = (current.x + (frame * current.width)) * 2;
+      if (frame >= current.length) {
+	    frame = 0;
+	  }
 
-    element.style.backgroundPosition = -pos.toString() + 'px ' + -current.y.toString() + 'px';
+      var pos = (current.x + (frame * current.width)) * 2;
 
-	return false;
-  };
+      element.style.backgroundPosition = -pos.toString() + 'px ' + -current.y.toString() + 'px';
 
-  return false;
-}
-function GameObject(sprite, vstep, vmax, scroll, bound) {
-  if (sprite instanceof SpriteSheet === false) { throw new Error('Please provide a sprite!') }
+	  return false;
+    };
 
+    return false;
+  }
+
+  return SpriteSheet;
+})();
+var GameObject = (function () {
+  var STAGE_WIDTH   = 320,
+	  STAGE_HEIGHT  = 112,
+	  FLOOR_OFFSET  = 6
   var FRICTION = .6;
   var VELOCITY_STEP_DEFAULT = .4,
       VELOCITY_MAX_DEFAULT  = 3;
   var BOUND_MAX = 9007199254740992;
 
-  vstep  = vstep  || VELOCITY_STEP_DEFAULT;
-  vmax   = vmax   || VELOCITY_MAX_DEFAULT;
-  scroll = scroll || 0;
-  bound  = bound  || BOUND_MAX;
-
-
-  if (!isNumber(scroll)) { throw new Error('GameObject with invalid starting scroll!') }
-  else if (scroll < 0) { throw new Error('GameObject scroll cannot be lower than 0!') }
-  if (!isNumber(vstep) || !isNumber(vmax)) { throw new Error('GameObject with invalid velocity data!') }
-  if (!isInt(bound)) { throw new Error('GameObject with invalid bound!') }
-  
-  var velocity = 0;
-
-  function push(k, value) {
-    k = k || 1;
-    value = value || vstep;
-
-    if (!isNumber(value)) { throw new Error('Push with invalid value of "' + value.toString() + '"!') }
-
-	value *= k;
-	velocity += value;
-	velocity = Math.min(vmax, Math.abs(velocity)) * (Math.abs(velocity) / (velocity || 1));
-	scroll -= velocity;
-
-	if ((k < 0 && sprite.isFlipped()) || (k > 0 && !sprite.isFlipped())) { sprite.flip() }
-
-	correctPosition();
-	correctAnimation();
-  }
-
-  function correctPosition() {
-    if (scroll < 0 || scroll > bound) {
-	  scroll = Math.min(bound, Math.max(0, scroll));
-	  velocity = 0;
+  function GameObject(sprite, vstep, vmax, scroll, bound) {
+    if (sprite instanceof SpriteSheet === false) {
+	  throw new Error('Please provide a sprite!');
 	}
-  }
 
-  function correctAnimation() {
-	if (Math.abs(velocity) <  1 && sprite.animation() === 'walk') { sprite.animation('idle') }
-	if (Math.abs(velocity) >= 1 && sprite.animation() === 'idle') { sprite.animation('walk') }
-  }
+    vstep  = vstep  || VELOCITY_STEP_DEFAULT;
+    vmax   = vmax   || VELOCITY_MAX_DEFAULT;
+    scroll = scroll || 0;
+    bound  = bound  || BOUND_MAX;
+
+    if (!isNumber(scroll)) {
+	  throw new Error('GameObject with invalid starting scroll!');
+	} else if (scroll < 0) {
+	  throw new Error('GameObject scroll cannot be lower than 0!');
+	}
+
+    if (!isNumber(vstep) || !isNumber(vmax)) {
+	  throw new Error('GameObject with invalid velocity data!');
+	}
+
+    if (!isInt(bound)) {
+	  throw new Error('GameObject with invalid bound!');
+	}
   
-  this.getSprite   = function () { return sprite };
-  this.getScroll   = function () { return scroll };
-  this.getVelocity = function () { return velocity };
+    var velocity = 0;
 
-  this.setBound = function (value) {
-    if (!isInt(bound)) { throw new Error('Bound should be integer!') }
+    function push(k, value) {
+      k = k || 1;
+      value = value || vstep;
 
-	bound = value;
-  };
+      if (!isNumber(value)) {
+	    throw new Error('Push with invalid value of "' + value.toString() + '"!');
+	  }
 
-  this.pushLeft  = push.curry();
-  this.pushRight = push.curry(-1);
+	  value *= k;
+	  velocity += value;
+	  velocity = Math.min(vmax, Math.abs(velocity)) * (Math.abs(velocity) / (velocity || 1));
+	  scroll -= velocity;
 
-  this.wait = function () {
-    velocity *= FRICTION;
+	  if ((k < 0 && sprite.isFlipped()) || (k > 0 && !sprite.isFlipped())) {
+	    sprite.flip();
+      }
 
-    if (Math.abs(velocity) < .1) { velocity = 0 }
+	  correctPosition();
+	  correctAnimation();
+    }
 
-	scroll -= velocity;
+    function correctPosition() {
+      if (scroll < 0 || scroll > bound) {
+	    scroll = Math.min(bound, Math.max(0, scroll));
+	    velocity = 0;
+	  }
+    }
 
-	correctAnimation();
-  };
-}
-function Room(name, type, width, depth) {
+    function correctAnimation() {
+	  if (Math.abs(velocity) <  1 && sprite.animation() === 'walk') {
+	    sprite.animation('idle');
+      }
+
+	  if (Math.abs(velocity) >= 1 && sprite.animation() === 'idle') {
+	    sprite.animation('walk');
+      }
+    }
+  
+    this.getSprite = function () {
+	  return sprite;
+	};
+
+    this.getScroll = function () {
+	  return scroll;
+	};
+
+    this.getVelocity = function () {
+	  return velocity;
+	};
+
+    this.setBound = function (value) {
+      if (!isInt(bound)) {
+	    throw new Error('Bound should be integer!');
+	  }
+
+	  bound = value;
+    };
+
+    this.pushLeft  = push.bind(this, 1);
+    this.pushRight = push.bind(this, -1);
+
+    this.wait = function () {
+      velocity *= FRICTION;
+
+      if (Math.abs(velocity) < .1) {
+	    velocity = 0;
+	  }
+
+	  scroll -= velocity;
+
+	  correctAnimation();
+    };
+
+	this.getDelta = function () {
+	  return (STAGE_WIDTH / 2) - (sprite.dimensions().width / 2)
+	};
+
+	this.correctPosition = function (roomWidth) {
+	  var position   = sprite.position(),
+	      dimensions = sprite.dimensions();
+
+	  var spriteWidth  = dimensions.width,
+	      spriteHeight = dimensions.height;
+
+	  position.y = STAGE_HEIGHT - spriteHeight - FLOOR_OFFSET;
+	
+	  var delta = this.getDelta();
+	
+	  var toLeft  = scroll < delta,
+	      toRight = scroll + delta >= roomWidth;
+
+	  if (!toLeft && !toRight) {
+	    position.x = delta;
+	  } else {
+	    position.x = toRight ? scroll - roomWidth + STAGE_WIDTH - spriteWidth : scroll;
+	  }
+
+	  sprite.position(position.x, position.y);
+	  sprite.next();
+	};
+  }
+
+  return GameObject;
+})();
+var Room = (function () {
   var TYPE_DEFAULT  = 'base',
       WIDTH_DEFAULT = 320;
 
-  if (!isValidString(name)) { throw new Error('Room without a name!') }
-
-  type  = type  || TYPE_DEFAULT;
-  width = width || WIDTH_DEFAULT;
-  depth = depth || 1;
-
-  if (!isValidString(type)) { throw new Error('Room with invalid type of "' + type + '"!') }
-  if (!isInt(width)) { throw new Error('Room with invalid width of "' + width + '"!') }
-  if (!isInt(depth)) { throw new Error('Room with invalid depth of "' + depth + '"!') }
-
-  width = Math.max(WIDTH_DEFAULT, width);
-
-  var tiles = [];
-
-  this.getName = function () { return name };
-  this.getWidth = function () { return width };
-
-  this.getTiles = function () {
-    if (tiles.length > 0) { return tiles }
-
-    for (var i = 0; i < depth; ++i) {
-      var t = div(),
-	      filename = depth === 1 ? type : type + '_' + i.toString();
-
-      t.style.backgroundImage = 'url(\'dist/i/tiles/' + type + '.png\')';
-
-      t.setAttribute('class', 'background__tile');
-      tiles.push(t);
+  function Room(name, type, width, depth) {
+    if (!isValidString(name)) {
+	  throw new Error('Room without a name!');
 	}
 
-    return tiles;
-  };
-}
+    type  = type  || TYPE_DEFAULT;
+    width = width || WIDTH_DEFAULT;
+    depth = depth || 1;
+
+    if (!isValidString(type)) {
+	  throw new Error('Room with invalid type of "' + type + '"!');
+	}
+
+    if (!isInt(width)) {
+	  throw new Error('Room with invalid width of "' + width + '"!');
+	}
+
+    if (!isInt(depth)) {
+	  throw new Error('Room with invalid depth of "' + depth + '"!');
+	}
+
+    width = Math.max(WIDTH_DEFAULT, width);
+
+    var tiles = [];
+
+    this.getName = function () {
+	  return name;
+	};
+
+    this.getWidth = function () {
+	  return width;
+	};
+
+    this.getTiles = function () {
+      if (tiles.length > 0) {
+	    return tiles;
+      }
+
+      for (var i = 0; i < depth; ++i) {
+        var t = div(),
+	        filename = depth === 1 ? type : type + '_' + i.toString();
+
+        t.style.backgroundImage = 'url(\'dist/i/tiles/' + type + '.png\')';
+
+        t.setAttribute('class', 'background__tile');
+        tiles.push(t);
+	  }
+
+      return tiles;
+    };
+  }
+
+  return Room;
+})();
 (function () {
-  var FRAME_STEP    = 80,
-      VELOCITY_STEP = .4,
-      VELOCITY_MAX  = 3,
-	  STAGE_WIDTH   = 320,
-	  STAGE_HEIGHT  = 112,
-	  FLOOR_OFFSET  = 6;
+  var FRAME_STEP = 80;
 
   // define sprites
   var SPRITES = {};
@@ -381,31 +504,13 @@ function Room(name, type, width, depth) {
         break;
     }
 
-	var sprite = activeObject.getSprite(),
-		scroll = activeObject.getScroll(),
+	var scroll = activeObject.getScroll(),
+		delta  = activeObject.getDelta(),
 		width  = currentRoom.getWidth();
 
-	var position   = sprite.position(),
-		dimensions = sprite.dimensions();
-
-	position.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
-
-	// TODO: move position logic to GameObject
-
-	var delta = (STAGE_WIDTH / 2) - (dimensions.width / 2);
-	var toLeft  = scroll < delta,
-	    toRight = scroll + delta >= width;
-
-	if (!toLeft && !toRight) {
-	  position.x = delta;
-	} else {
-	  position.x = toRight ? scroll - width + STAGE_WIDTH - dimensions.width : scroll;
-	}
-	
 	updateView(scroll, width, delta);
 
-	sprite.next();
-	sprite.position(position.x, position.y);
+	activeObject.correctPosition(width);
   }
 
   function loadLevel(room, objects) {
