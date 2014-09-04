@@ -32,16 +32,18 @@ var SpriteSheet = (function () {
   var CLASS_FLIPPED = 'stage__sprite_style_flipped',
       ANIMATION_OPTIONS_ALLOWED = ['x', 'y', 'width', 'height', 'length', 'delays', 'offsetX', 'offsetY'];
 
-  function SpriteSheet(name) {
+  function SpriteSheet(name, animations) {
     if (!isValidString(name)) {
 	  throw new Error('SpriteSheet without a name!');
 	}
 
+	animations = animations || {};
+
 	var that = this;
 
-    var animations = {};
     var flipped = false;
-    var current, frame, delay;
+    var current = animations.default;
+	var frame, delay;
 
     var x = 0,
         y = 0;
@@ -100,20 +102,20 @@ var SpriteSheet = (function () {
       return this;
     };
 
-    this.dimensions = function (name) {
-      name = name || current.name;
+    this.dimensions = function (_name) {
+      _name = _name || current.name;
 
-      if (!isValidString(name)) {
+      if (!isValidString(_name)) {
 	    throw new Error('Animation with invalid name!');
 	  }
 
-	  if (_dimensions && _dimensions.name === name) {
+	  if (_dimensions && _dimensions.name === _name) {
 	    return _dimensions;
 	  }
 
 	  _dimensions = {};
 
-      var source = animations[name];
+      var source = animations[_name];
 
 	  for (var prop in source) {
 	    if (source.hasOwnProperty(prop)) {
@@ -124,19 +126,20 @@ var SpriteSheet = (function () {
 	  return _dimensions;
     };
 
-    this.animation = function (name, options) {
+    this.animation = function (_name, options) {
       if (!arguments.length) {
 	    return current !== undefined ? current.name : null;
 	  }
 
-      if (!isValidString(name)) {
+      if (!isValidString(_name)) {
 	    throw new Error('Animation with invalid name!');
 	  } else if (arguments.length === 1) { // setting current animation
-        frame = delay = 0;
-        current = animations[name];
+        frame = 0;
+		delay = 0;
+        current = animations[_name];
 
         if (!current) {
-		  throw new Error('No animation with a name of "' + name + '"');
+		  throw new Error('No animation with a name of "' + _name + '"');
 		}
 
 	    var width  = current.width * 2,
@@ -160,7 +163,7 @@ var SpriteSheet = (function () {
 		}
       }
 
-      o.name = name;
+      o.name = _name;
 
       var dimensions = ['x', 'y', 'offsetX', 'offsetY'];
 
@@ -192,9 +195,13 @@ var SpriteSheet = (function () {
 	    o.delays = o.delays.slice(0, o.length - 1);
 	  }
 
-      animations[name] = options;
-    
-      return this.animation(name);
+      animations[_name] = options;
+
+	  if (animations.default === undefined) {
+	    animations.default = animations[_name];
+	  }
+
+      return this.animation(_name);
     };
 
     this.next = function () {
@@ -217,7 +224,13 @@ var SpriteSheet = (function () {
 	  return false;
     };
 
-    return false;
+	this.clone = function () {
+	  return new SpriteSheet(name, animations);
+	};
+
+	if (current) {
+	  this.animation('default');
+	}
   }
 
   return SpriteSheet;
@@ -334,7 +347,19 @@ var GameObject = (function () {
 	  return (STAGE_WIDTH / 2) - (sprite.dimensions().width / 2)
 	};
 
-	this.correctPosition = function (roomWidth) {
+	this.leftCornerReached = function () {
+	  return scroll < this.getDelta();
+	};
+
+	this.rightCornerReached = function () {
+	  return scroll + this.getDelta() >= bound;
+	};
+
+	this.correctPosition = function (relative) {
+      if (relative !== null && !(relative instanceof GameObject))	{
+	    throw new Error('invalid relative object');
+	  }
+
 	  var position   = sprite.position(),
 	      dimensions = sprite.dimensions();
 
@@ -342,20 +367,27 @@ var GameObject = (function () {
 	      spriteHeight = dimensions.height;
 
 	  position.y = STAGE_HEIGHT - spriteHeight - FLOOR_OFFSET;
-	
-	  var delta = this.getDelta();
-	
-	  var toLeft  = scroll < delta,
-	      toRight = scroll + delta >= roomWidth;
 
-	  if (!toLeft && !toRight) {
-	    position.x = delta;
-	  } else {
-	    position.x = toRight ? scroll - roomWidth + STAGE_WIDTH - spriteWidth : scroll;
+	  var right = Math.floor(scroll - bound + STAGE_WIDTH - spriteWidth) - 1, // correct missing pixel
+	      left  = Math.floor(scroll);
+
+	  if (relative) { // object provided, position sprite relative to it
+	    var _scroll = relative.getScroll();
+
+		if (!relative.leftCornerReached() && !relative.rightCornerReached()) {
+		  position.x = (STAGE_WIDTH / 2) - Math.ceil(sprite.dimensions().width / 2) - Math.floor(_scroll - scroll);
+		} else {
+		  position.x = relative.rightCornerReached() ? right : left;
+		}
+	  } else { // no object provided, position sprite relative to bounds
+	    if (!this.leftCornerReached() && !this.rightCornerReached()) {
+	      position.x = this.getDelta(); // center sprite
+	    } else {
+	      position.x = this.rightCornerReached() ? right : left;
+	    }
 	  }
-
+	  
 	  sprite.position(position.x, position.y);
-	  sprite.next();
 	};
   }
 
@@ -426,8 +458,8 @@ var Room = (function () {
   var SPRITES = {};
 
   SPRITES.hero = new SpriteSheet('hero')
-  .animation('walk', { x: 37, width: 37, height: 72, length: 16 })
-  .animation('idle', { width: 37, height: 72 });
+  .animation('idle', { width: 37, height: 72 })
+  .animation('walk', { x: 37, width: 37, height: 72, length: 16 });
 
   var pressed = [],
       sprites = [];
@@ -466,21 +498,36 @@ var Room = (function () {
 
   background.setAttribute('class', 'background');
  
-  var currentRoom, activeObject;
-
-  function placeSprites() {
-    stage.appendChild(activeObject.getSprite().getElement());
-  };
-
-  function placeBackground() { currentRoom.getTiles().forEach(function (t) { background.appendChild(t) }) }
+  var currentRoom, loadedObjects, activeObject;
 
   function updateView(scroll, width, delta) {
-    var tiles  = currentRoom.getTiles();
+	var scroll = activeObject.getScroll(),
+	    delta  = Math.floor(activeObject.getDelta()),
+	    width  = currentRoom.getWidth();
+
+	var children = Array.prototype.slice.call(stage.childNodes, 0);
+
+	loadedObjects.forEach(function (object) {
+	  var sprite  = object.getSprite(),
+	      element = sprite.getElement();
+
+	  object.correctPosition(object === activeObject ? null : activeObject);
+	  sprite.next();
+	
+	  if (!contains(children, element)) {
+	    stage.appendChild(element);
+	  }
+	});
 
 	var x = 0;
-	
-	if (scroll + delta >= width) { x = width - (delta * 2) }
-	else if (scroll >= delta) { x = scroll - delta }
+		
+	if (scroll + delta >= width) {
+	  x = width - (delta * 2);
+	} else if (scroll >= delta) {
+	  x = Math.floor(scroll) - delta;
+	}
+
+	var tiles = currentRoom.getTiles();
 
     tiles.forEach(function (t, i) {
       var p = -Math.floor(x / (tiles.length - i)) * 2;
@@ -504,13 +551,7 @@ var Room = (function () {
         break;
     }
 
-	var scroll = activeObject.getScroll(),
-		delta  = activeObject.getDelta(),
-		width  = currentRoom.getWidth();
-
-	updateView(scroll, width, delta);
-
-	activeObject.correctPosition(width);
+	updateView();
   }
 
   function loadLevel(room, objects) {
@@ -522,18 +563,27 @@ var Room = (function () {
       throw new Error('Please provide a correct array of objects!');
     }
 
-	objects.forEach(function (obj) {
-	  obj.setBound(room.getWidth());
+    currentRoom   = room;
+	loadedObjects = objects;
+	activeObject  = objects[0];
+
+	loadedObjects.forEach(function (object) {
+	  object.setBound(room.getWidth());
 	});
 
-    currentRoom  = room;
-	activeObject = objects[0];
+	currentRoom.getTiles().forEach(function (tile) {
+	  background.appendChild(tile)
+	});
 
-	placeSprites();
-    placeBackground();
+	stage.appendChild(activeObject.getSprite().getElement());
   }
 
-  loadLevel(new Room('blank', null, 420), [new GameObject(SPRITES.hero)]);
+  loadLevel(new Room('blank', null, 840), [
+    new GameObject(SPRITES.hero, null, null, 740),
+	new GameObject(SPRITES.hero.clone(), null, null, 40),
+	new GameObject(SPRITES.hero.clone(), null, null, 400),
+	new GameObject(SPRITES.hero.clone(), null, null, 780)
+  ]);
 
   setInterval(nextFrame, FRAME_STEP);
 })();

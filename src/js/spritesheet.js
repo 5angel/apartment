@@ -2,16 +2,18 @@ var SpriteSheet = (function () {
   var CLASS_FLIPPED = 'stage__sprite_style_flipped',
       ANIMATION_OPTIONS_ALLOWED = ['x', 'y', 'width', 'height', 'length', 'delays', 'offsetX', 'offsetY'];
 
-  function SpriteSheet(name) {
+  function SpriteSheet(name, animations) {
     if (!isValidString(name)) {
 	  throw new Error('SpriteSheet without a name!');
 	}
 
+	animations = animations || {};
+
 	var that = this;
 
-    var animations = {};
     var flipped = false;
-    var current, frame, delay;
+    var current = animations.default;
+	var frame, delay;
 
     var x = 0,
         y = 0;
@@ -70,20 +72,20 @@ var SpriteSheet = (function () {
       return this;
     };
 
-    this.dimensions = function (name) {
-      name = name || current.name;
+    this.dimensions = function (_name) {
+      _name = _name || current.name;
 
-      if (!isValidString(name)) {
+      if (!isValidString(_name)) {
 	    throw new Error('Animation with invalid name!');
 	  }
 
-	  if (_dimensions && _dimensions.name === name) {
+	  if (_dimensions && _dimensions.name === _name) {
 	    return _dimensions;
 	  }
 
 	  _dimensions = {};
 
-      var source = animations[name];
+      var source = animations[_name];
 
 	  for (var prop in source) {
 	    if (source.hasOwnProperty(prop)) {
@@ -94,19 +96,20 @@ var SpriteSheet = (function () {
 	  return _dimensions;
     };
 
-    this.animation = function (name, options) {
+    this.animation = function (_name, options) {
       if (!arguments.length) {
 	    return current !== undefined ? current.name : null;
 	  }
 
-      if (!isValidString(name)) {
+      if (!isValidString(_name)) {
 	    throw new Error('Animation with invalid name!');
 	  } else if (arguments.length === 1) { // setting current animation
-        frame = delay = 0;
-        current = animations[name];
+        frame = 0;
+		delay = 0;
+        current = animations[_name];
 
         if (!current) {
-		  throw new Error('No animation with a name of "' + name + '"');
+		  throw new Error('No animation with a name of "' + _name + '"');
 		}
 
 	    var width  = current.width * 2,
@@ -130,7 +133,7 @@ var SpriteSheet = (function () {
 		}
       }
 
-      o.name = name;
+      o.name = _name;
 
       var dimensions = ['x', 'y', 'offsetX', 'offsetY'];
 
@@ -162,9 +165,13 @@ var SpriteSheet = (function () {
 	    o.delays = o.delays.slice(0, o.length - 1);
 	  }
 
-      animations[name] = options;
-    
-      return this.animation(name);
+      animations[_name] = options;
+
+	  if (animations.default === undefined) {
+	    animations.default = animations[_name];
+	  }
+
+      return this.animation(_name);
     };
 
     this.next = function () {
@@ -187,7 +194,13 @@ var SpriteSheet = (function () {
 	  return false;
     };
 
-    return false;
+	this.clone = function () {
+	  return new SpriteSheet(name, animations);
+	};
+
+	if (current) {
+	  this.animation('default');
+	}
   }
 
   return SpriteSheet;

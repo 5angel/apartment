@@ -5,8 +5,8 @@
   var SPRITES = {};
 
   SPRITES.hero = new SpriteSheet('hero')
-  .animation('walk', { x: 37, width: 37, height: 72, length: 16 })
-  .animation('idle', { width: 37, height: 72 });
+  .animation('idle', { width: 37, height: 72 })
+  .animation('walk', { x: 37, width: 37, height: 72, length: 16 });
 
   var pressed = [],
       sprites = [];
@@ -45,21 +45,36 @@
 
   background.setAttribute('class', 'background');
  
-  var currentRoom, activeObject;
-
-  function placeSprites() {
-    stage.appendChild(activeObject.getSprite().getElement());
-  };
-
-  function placeBackground() { currentRoom.getTiles().forEach(function (t) { background.appendChild(t) }) }
+  var currentRoom, loadedObjects, activeObject;
 
   function updateView(scroll, width, delta) {
-    var tiles  = currentRoom.getTiles();
+	var scroll = activeObject.getScroll(),
+	    delta  = Math.floor(activeObject.getDelta()),
+	    width  = currentRoom.getWidth();
+
+	var children = Array.prototype.slice.call(stage.childNodes, 0);
+
+	loadedObjects.forEach(function (object) {
+	  var sprite  = object.getSprite(),
+	      element = sprite.getElement();
+
+	  object.correctPosition(object === activeObject ? null : activeObject);
+	  sprite.next();
+	
+	  if (!contains(children, element)) {
+	    stage.appendChild(element);
+	  }
+	});
 
 	var x = 0;
-	
-	if (scroll + delta >= width) { x = width - (delta * 2) }
-	else if (scroll >= delta) { x = scroll - delta }
+		
+	if (scroll + delta >= width) {
+	  x = width - (delta * 2);
+	} else if (scroll >= delta) {
+	  x = Math.floor(scroll) - delta;
+	}
+
+	var tiles = currentRoom.getTiles();
 
     tiles.forEach(function (t, i) {
       var p = -Math.floor(x / (tiles.length - i)) * 2;
@@ -83,13 +98,7 @@
         break;
     }
 
-	var scroll = activeObject.getScroll(),
-		delta  = activeObject.getDelta(),
-		width  = currentRoom.getWidth();
-
-	updateView(scroll, width, delta);
-
-	activeObject.correctPosition(width);
+	updateView();
   }
 
   function loadLevel(room, objects) {
@@ -101,18 +110,27 @@
       throw new Error('Please provide a correct array of objects!');
     }
 
-	objects.forEach(function (obj) {
-	  obj.setBound(room.getWidth());
+    currentRoom   = room;
+	loadedObjects = objects;
+	activeObject  = objects[0];
+
+	loadedObjects.forEach(function (object) {
+	  object.setBound(room.getWidth());
 	});
 
-    currentRoom  = room;
-	activeObject = objects[0];
+	currentRoom.getTiles().forEach(function (tile) {
+	  background.appendChild(tile)
+	});
 
-	placeSprites();
-    placeBackground();
+	stage.appendChild(activeObject.getSprite().getElement());
   }
 
-  loadLevel(new Room('blank', null, 420), [new GameObject(SPRITES.hero)]);
+  loadLevel(new Room('blank', null, 840), [
+    new GameObject(SPRITES.hero, null, null, 740),
+	new GameObject(SPRITES.hero.clone(), null, null, 40),
+	new GameObject(SPRITES.hero.clone(), null, null, 400),
+	new GameObject(SPRITES.hero.clone(), null, null, 780)
+  ]);
 
   setInterval(nextFrame, FRAME_STEP);
 })();

@@ -110,7 +110,19 @@ var GameObject = (function () {
 	  return (STAGE_WIDTH / 2) - (sprite.dimensions().width / 2)
 	};
 
-	this.correctPosition = function (roomWidth) {
+	this.leftCornerReached = function () {
+	  return scroll < this.getDelta();
+	};
+
+	this.rightCornerReached = function () {
+	  return scroll + this.getDelta() >= bound;
+	};
+
+	this.correctPosition = function (relative) {
+      if (relative !== null && !(relative instanceof GameObject))	{
+	    throw new Error('invalid relative object');
+	  }
+
 	  var position   = sprite.position(),
 	      dimensions = sprite.dimensions();
 
@@ -118,20 +130,27 @@ var GameObject = (function () {
 	      spriteHeight = dimensions.height;
 
 	  position.y = STAGE_HEIGHT - spriteHeight - FLOOR_OFFSET;
-	
-	  var delta = this.getDelta();
-	
-	  var toLeft  = scroll < delta,
-	      toRight = scroll + delta >= roomWidth;
 
-	  if (!toLeft && !toRight) {
-	    position.x = delta;
-	  } else {
-	    position.x = toRight ? scroll - roomWidth + STAGE_WIDTH - spriteWidth : scroll;
+	  var right = Math.floor(scroll - bound + STAGE_WIDTH - spriteWidth) - 1, // correct missing pixel
+	      left  = Math.floor(scroll);
+
+	  if (relative) { // object provided, position sprite relative to it
+	    var _scroll = relative.getScroll();
+
+		if (!relative.leftCornerReached() && !relative.rightCornerReached()) {
+		  position.x = (STAGE_WIDTH / 2) - Math.ceil(sprite.dimensions().width / 2) - Math.floor(_scroll - scroll);
+		} else {
+		  position.x = relative.rightCornerReached() ? right : left;
+		}
+	  } else { // no object provided, position sprite relative to bounds
+	    if (!this.leftCornerReached() && !this.rightCornerReached()) {
+	      position.x = this.getDelta(); // center sprite
+	    } else {
+	      position.x = this.rightCornerReached() ? right : left;
+	    }
 	  }
-
+	  
 	  sprite.position(position.x, position.y);
-	  sprite.next();
 	};
   }
 
