@@ -1,5 +1,7 @@
 (function () {
-  var FRAME_STEP = 80;
+  var STAGE_WIDTH   = 320,
+	  STAGE_HEIGHT  = 112,
+      FRAME_STEP = 80;
 
   // define sprites
   var SPRITES = {};
@@ -60,9 +62,16 @@
 
 	  object.correctPosition(object === activeObject ? null : activeObject);
 	  sprite.next();
-	
-	  if (!contains(children, element)) {
-	    stage.appendChild(element);
+
+	  var pos = sprite.position(),
+		  dim = sprite.dimensions();
+
+	  var hidden = pos.x + dim.width < 0 || pos.x >= STAGE_WIDTH || pos.y + dim.height < 0 || pos.y >= STAGE_HEIGHT;
+
+	  if (hidden && contains(children, element)) {
+	    stage.removeChild(element);	// remove hidden elements
+	  } else if (!hidden && !contains(children, element)) {
+	    stage.appendChild(element); // add visible elements
 	  }
 	});
 

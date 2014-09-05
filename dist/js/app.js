@@ -452,7 +452,9 @@ var Room = (function () {
   return Room;
 })();
 (function () {
-  var FRAME_STEP = 80;
+  var STAGE_WIDTH   = 320,
+	  STAGE_HEIGHT  = 112,
+      FRAME_STEP = 80;
 
   // define sprites
   var SPRITES = {};
@@ -513,8 +515,19 @@ var Room = (function () {
 
 	  object.correctPosition(object === activeObject ? null : activeObject);
 	  sprite.next();
-	
-	  if (!contains(children, element)) {
+
+	  var x      = sprite.position().x,
+	      y      = sprite.position().y,
+		  width  = sprite.dimensions().width,
+		  height = sprite.dimensions().height;
+
+		  
+	  var hidden = x + width < 0 || x >= STAGE_WIDTH || y + height < 0 || y >= STAGE_HEIGHT;
+
+	  if (hidden && contains(children, element)) {
+	    children.splice(children.indexOf(element), 1);
+	    stage.removeChild(element);
+	  } else if (!hidden && !contains(children, element)) {
 	    stage.appendChild(element);
 	  }
 	});
