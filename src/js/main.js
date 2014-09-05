@@ -56,12 +56,12 @@
 
 	var children = Array.prototype.slice.call(stage.childNodes, 0);
 
-	loadedObjects.forEach(function (object) {
+	loadedObjects.forEach(function (object, i) {
 	  var sprite  = object.getSprite(),
 	      element = sprite.getElement();
 
-	  object.correctPosition(object === activeObject ? null : activeObject);
-	  sprite.next();
+      object.correctPosition(object === activeObject ? null : activeObject);
+      sprite.next();
 
 	  var pos = sprite.position(),
 		  dim = sprite.dimensions();
@@ -122,6 +122,8 @@
     currentRoom   = room;
 	loadedObjects = objects;
 	activeObject  = objects[0];
+
+	activeObject.getSprite().index(1);
 
 	loadedObjects.forEach(function (object) {
 	  object.setBound(room.getWidth());

@@ -46,7 +46,8 @@ var SpriteSheet = (function () {
 	var frame, delay;
 
     var x = 0,
-        y = 0;
+        y = 0
+		index = 0;
 
     var element = div();
   
@@ -91,6 +92,14 @@ var SpriteSheet = (function () {
 	    element.style.top = Math.floor(ny).toString() + 'px';
 	  }
     };
+
+	this.index = function (value) {
+	  if (!arguments.length) {
+	    return index;
+	  }
+
+	  index = value;
+	}
 
     this.flip = function () {
       flipped = !flipped;
@@ -151,6 +160,7 @@ var SpriteSheet = (function () {
         element.style.width  = width.toString() + 'px' || 'auto';
         element.style.height = height.toString() + 'px' || 'auto';
         element.style.backgroundPosition = -px.toString() + 'px ' + -py.toString() + 'px';
+		element.style.zIndex = index;
 
         return this;
       }
@@ -509,26 +519,22 @@ var Room = (function () {
 
 	var children = Array.prototype.slice.call(stage.childNodes, 0);
 
-	loadedObjects.forEach(function (object) {
+	loadedObjects.forEach(function (object, i) {
 	  var sprite  = object.getSprite(),
 	      element = sprite.getElement();
 
-	  object.correctPosition(object === activeObject ? null : activeObject);
-	  sprite.next();
+      object.correctPosition(object === activeObject ? null : activeObject);
+      sprite.next();
 
-	  var x      = sprite.position().x,
-	      y      = sprite.position().y,
-		  width  = sprite.dimensions().width,
-		  height = sprite.dimensions().height;
+	  var pos = sprite.position(),
+		  dim = sprite.dimensions();
 
-		  
-	  var hidden = x + width < 0 || x >= STAGE_WIDTH || y + height < 0 || y >= STAGE_HEIGHT;
+	  var hidden = pos.x + dim.width < 0 || pos.x >= STAGE_WIDTH || pos.y + dim.height < 0 || pos.y >= STAGE_HEIGHT;
 
 	  if (hidden && contains(children, element)) {
-	    children.splice(children.indexOf(element), 1);
-	    stage.removeChild(element);
+	    stage.removeChild(element);	// remove hidden elements
 	  } else if (!hidden && !contains(children, element)) {
-	    stage.appendChild(element);
+	    stage.appendChild(element); // add visible elements
 	  }
 	});
 
@@ -579,6 +585,8 @@ var Room = (function () {
     currentRoom   = room;
 	loadedObjects = objects;
 	activeObject  = objects[0];
+
+	activeObject.getSprite().index(1);
 
 	loadedObjects.forEach(function (object) {
 	  object.setBound(room.getWidth());

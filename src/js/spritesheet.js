@@ -16,7 +16,8 @@ var SpriteSheet = (function () {
 	var frame, delay;
 
     var x = 0,
-        y = 0;
+        y = 0
+		index = 0;
 
     var element = div();
   
@@ -61,6 +62,14 @@ var SpriteSheet = (function () {
 	    element.style.top = Math.floor(ny).toString() + 'px';
 	  }
     };
+
+	this.index = function (value) {
+	  if (!arguments.length) {
+	    return index;
+	  }
+
+	  index = value;
+	}
 
     this.flip = function () {
       flipped = !flipped;
@@ -121,6 +130,7 @@ var SpriteSheet = (function () {
         element.style.width  = width.toString() + 'px' || 'auto';
         element.style.height = height.toString() + 'px' || 'auto';
         element.style.backgroundPosition = -px.toString() + 'px ' + -py.toString() + 'px';
+		element.style.zIndex = index;
 
         return this;
       }
