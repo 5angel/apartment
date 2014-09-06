@@ -41,7 +41,7 @@ var Room = (function () {
       }
 
       for (var i = 0; i < depth; ++i) {
-        var t = div(),
+        var t = document.createElement('div'),
 	        filename = depth === 1 ? type : type + '_' + i.toString();
 
         t.style.backgroundImage = 'url(\'dist/i/tiles/' + type + '.png\')';

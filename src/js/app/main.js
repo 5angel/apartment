@@ -7,8 +7,8 @@
   var SPRITES = {};
 
   SPRITES.hero = new SpriteSheet('hero')
-  .animation('idle', { width: 37, height: 72 })
-  .animation('walk', { x: 37, width: 37, height: 72, length: 16 });
+  .addAnimation('idle', { width: 37, height: 72 })
+  .addAnimation('walk', { x: 37, width: 37, height: 72, length: 16 });
 
   var pressed = [],
       sprites = [];
@@ -30,9 +30,9 @@
     if (index !== -1) pressed.splice(index, 1);
   }
 
-  var screen = div(),
-      stage = div(),
-      background = div();
+  var screen     = document.createElement('div'),
+      stage      = document.createElement('div'),
+      background = document.createElement('div');
 
   document.body.appendChild(screen);
 
@@ -57,21 +57,23 @@
 	var children = Array.prototype.slice.call(stage.childNodes, 0);
 
 	loadedObjects.forEach(function (object, i) {
-	  var sprite  = object.getSprite(),
-	      element = sprite.getElement();
+	  var sprite  = object.getSprite();
 
       object.correctPosition(object === activeObject ? null : activeObject);
       sprite.next();
+	  sprite.update();
 
-	  var pos = sprite.position(),
-		  dim = sprite.dimensions();
+	  var width  = sprite.getDimensions().width,
+	      height = sprite.getDimensions().height;
 
-	  var hidden = pos.x + dim.width < 0 || pos.x >= STAGE_WIDTH || pos.y + dim.height < 0 || pos.y >= STAGE_HEIGHT;
+	  var hidden = sprite.x + width < 0 || sprite.x >= STAGE_WIDTH || sprite.y + height < 0 || sprite.y >= STAGE_HEIGHT;
 
-	  if (hidden && contains(children, element)) {
-	    stage.removeChild(element);	// remove hidden elements
-	  } else if (!hidden && !contains(children, element)) {
-	    stage.appendChild(element); // add visible elements
+	  var target = sprite.element.target;
+
+	  if (hidden && contains(children, target)) {
+	    stage.removeChild(target);	// remove hidden elements
+	  } else if (!hidden && !contains(children, target)) {
+	    stage.appendChild(target); // add visible elements
 	  }
 	});
 
@@ -123,17 +125,18 @@
 	loadedObjects = objects;
 	activeObject  = objects[0];
 
-	activeObject.getSprite().index(1);
+	activeObject.getSprite().index = 1;
 
 	loadedObjects.forEach(function (object) {
 	  object.setBound(room.getWidth());
+	  object.getSprite().redraw();
 	});
 
 	currentRoom.getTiles().forEach(function (tile) {
 	  background.appendChild(tile)
 	});
 
-	stage.appendChild(activeObject.getSprite().getElement());
+	stage.appendChild(activeObject.getSprite().element.target);
   }
 
   loadLevel(new Room('blank', null, 840), [

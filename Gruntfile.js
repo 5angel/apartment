@@ -21,7 +21,15 @@ module.exports = function(grunt) {
 	},
     concat: {
       dist: {
-        src: FILES,
+        src: [
+		  'src/js/app/common.js',
+		  'src/js/classes/richHTMLElement.js',
+		  'src/js/classes/spritesheet.js',
+		  'src/js/classes/gameObject.js',
+		  'src/js/classes/*.js',
+		  'src/js/app/main.js',
+		  'src/js/**/*.js'
+		],
         dest: 'dist/js/app.js',
       },
     },

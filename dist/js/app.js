@@ -1,18 +1,3 @@
-function addClassTo(name, el) {
-  var list = el.className.split(/\s+/);
-  if (list.indexOf(name) === -1) { list.push(name) }
-  el.className = list.join(' ');
-  return el;
-}
-
-function removeClassFrom(name, el) {
-  var list  = el.className.split(/\s+/),
-      index = list.indexOf(name);
-  if (index !== -1) { list.splice(index, 1) }
-  el.className = list.join(' ');
-  return el;
-}
-
 function isArray(obj) { return Object.prototype.toString.call(obj) === '[object Array]' }
 
 function isNumber(n) { return !isNaN(parseFloat(n)) && isFinite(n) }
@@ -21,229 +6,193 @@ function isInt(n) { return typeof n === 'number' && n % 1 == 0 }
 
 function isValidString(str) { return typeof str === 'string' && str !== '' }
 
-function div() { return document.createElement('div') }
-
 function contains(array) {
   if (arguments.length < 2) { throw new Error('Nothing to search for!') }
   var args = Array.prototype.slice.call(arguments).slice(1);
   return args.every(function (item) { return array.indexOf(item) !== -1 });
 }
+var RichHTMLElement = (function () {
+  function RichHTMLElement(element) {
+    this.target = element;
+  }
+
+  RichHTMLElement.prototype.getClasses = function () {
+    return this.target.className.split(/\s+/);
+  };
+
+  RichHTMLElement.prototype.hasClass = function (name) {
+	return this.getClasses().indexOf(name) !== -1;
+  };
+
+  RichHTMLElement.prototype.addClass = function (name) {
+	if (!this.hasClass(name)) {
+	  var classes = this.getClasses();
+
+	  classes.push(name);
+
+	  this.target.className = classes.join(' ');
+	}
+  };
+
+  RichHTMLElement.prototype.removeClass = function (name) {
+	if (this.hasClass(name)) {
+	  var classes = this.getClasses(),
+	      index   = classes.indexOf(name);
+
+	  classes.splice(index, 1);
+
+	  this.target.className = classes.join(' ');
+	}
+  };
+
+  return RichHTMLElement;
+})();
+
 var SpriteSheet = (function () {
-  var CLASS_FLIPPED = 'stage__sprite_style_flipped',
-      ANIMATION_OPTIONS_ALLOWED = ['x', 'y', 'width', 'height', 'length', 'delays', 'offsetX', 'offsetY'];
+	var SRC_BASE = 'url(\'dist/i/sprites/',
+	    SRC_TAIL = '.png\')';
 
-  function SpriteSheet(name, animations) {
-    if (!isValidString(name)) {
-	  throw new Error('SpriteSheet without a name!');
-	}
+	var CLASS_BASE    = 'stage__sprite',
+	    CLASS_FLIPPED = CLASS_BASE + '_style_flipped';
 
-	animations = animations || {};
+	var ANIMATION_OPTIONS_ALLOWED    = ['x', 'y', 'offsetX', 'offsetY', 'width', 'height', 'length', 'delays'],
+	    ANIMATION_OPTIONS_DIMENSIONS = ANIMATION_OPTIONS_ALLOWED.slice(0, 4);
 
-	var that = this;
-
-    var flipped = false;
-    var current = animations.default;
-	var frame, delay;
-
-    var x = 0,
-        y = 0
-		index = 0;
-
-    var element = div();
-  
-    var _dimensions;
-
-    element.style.backgroundImage = 'url(\'dist/i/sprites/' + name + '.png\')';
-    element.setAttribute('class', 'stage__sprite');
-
-    this.getName = function () {
-	  return name;
-	};
-
-    this.getElement = function () {
-	  return element;
-	};
-
-    this.isFlipped  = function () {
-	  return flipped;
-	};
-
-    this.position = function (nx, ny) {
-      if (!arguments.length) {
-	    return { x: x, y: y };
-	  }
-
-      nx = nx === 0 ? 0 : nx || x;
-	  ny = ny === 0 ? 0 : ny || y;
-
-	  if (!isNumber(nx) || !isNumber(ny)) {
-	    throw new Error('Invalid coordinates!');
-	  }
-
-	  if (nx !== x) {
-	    x = nx;
-	    nx *= 2;
-	    element.style.left = Math.floor(nx).toString() + 'px';
-	  }
-
-	  if (ny !== y) {
-	    y = ny;
-	    ny *= 2;
-	    element.style.top = Math.floor(ny).toString() + 'px';
-	  }
-    };
-
-	this.index = function (value) {
-	  if (!arguments.length) {
-	    return index;
-	  }
-
-	  index = value;
-	}
-
-    this.flip = function () {
-      flipped = !flipped;
-
-      flipped
-	    ? addClassTo(CLASS_FLIPPED, element)
-	    : removeClassFrom(CLASS_FLIPPED, element);
-
-      return this;
-    };
-
-    this.dimensions = function (_name) {
-      _name = _name || current.name;
-
-      if (!isValidString(_name)) {
-	    throw new Error('Animation with invalid name!');
-	  }
-
-	  if (_dimensions && _dimensions.name === _name) {
-	    return _dimensions;
-	  }
-
-	  _dimensions = {};
-
-      var source = animations[_name];
-
-	  for (var prop in source) {
-	    if (source.hasOwnProperty(prop)) {
-		  _dimensions[prop] = source[prop];
-		}
-	  }
-
-	  return _dimensions;
-    };
-
-    this.animation = function (_name, options) {
-      if (!arguments.length) {
-	    return current !== undefined ? current.name : null;
-	  }
-
-      if (!isValidString(_name)) {
-	    throw new Error('Animation with invalid name!');
-	  } else if (arguments.length === 1) { // setting current animation
-        frame = 0;
-		delay = 0;
-        current = animations[_name];
-
-        if (!current) {
-		  throw new Error('No animation with a name of "' + _name + '"');
+	function validateOptions(options) {
+		for (var key in options) {
+			if (!contains(ANIMATION_OPTIONS_ALLOWED, key)) {
+				throw new Error('Key "' + key + '" is not allowed!');
+			} else if (!isInt(options[key])) {
+				throw new Error('Key "' + key + '" should be an integer!');
+			}
 		}
 
-	    var width  = current.width * 2,
+		ANIMATION_OPTIONS_DIMENSIONS.forEach(function (key) {
+			options[key] = options[key] || 0;
+		});
+
+		if (isNaN(options.width) || options.width <= 0) {
+			throw new Error('Animation without a width!');
+		}
+
+		options.height = options.height || options.width;    
+		options.length = options.length || 1;
+		options.delays = options.delays || [];
+
+		while (options.delays.length < options.length) {
+			options.delays.push(0);
+		}
+
+		return options;
+	}
+
+	function SpriteSheet(name, animations) {
+		this.name      = name;
+		this.element   = new RichHTMLElement(document.createElement('div'));
+		this.index     = 0;
+		this.frame     = 0;
+		this.delay     = 0;
+		this.flipped   = false;
+		this.animation = animations ? animations.default : null;
+
+		this.element.target.style.backgroundImage = SRC_BASE + name + SRC_TAIL;
+		this.element.addClass(CLASS_BASE);
+
+		animations = animations || {};
+
+		this.addAnimation = function (name, options) {
+			options = validateOptions(options);
+
+			animations[name] = options;
+			this.animation = name;
+
+			if (!animations.default) {
+				animations.default = name;
+			}
+
+			this.redraw();
+
+			return this;
+		};
+
+		this.getAnimation = function (name) {
+			return animations[name || this.animation];
+		};
+
+		this.clone = function () {
+			return new SpriteSheet(name, animations)
+		};
+	}
+
+	SpriteSheet.prototype.getDimensions = function () {
+		var animation = this.getAnimation(),
+		    dimensions = {
+				width: animation.width,
+				height: animation.height
+			};
+
+		return dimensions;
+	};
+
+	SpriteSheet.prototype.next = function () {
+		this.delay++;
+
+		var current = this.getAnimation();
+
+		if (this.delay < current.delays[this.frame]) {
+			return this.delay + 1 >= current.delays[frame] && this.frame + 1 >= current.length;
+		} else { this.delay = 0 }
+
+		this.frame++;
+
+		if (this.frame >= current.length) {
+			this.frame = 0;
+		}
+
+		var posX = (current.x + (this.frame * current.width)) * 2,
+		    posY = current.y;
+
+		this.element.target.style.backgroundPosition = -posX.toString() + 'px ' + -posY.toString() + 'px';
+
+		return false;
+	};
+
+	SpriteSheet.prototype.update = function () {
+	    var style = this.element.target.style;	
+		
+		style.left = Math.floor(this.x * 2).toString() + 'px';
+		style.top  = Math.floor(this.y * 2).toString() + 'px';
+	};
+
+	SpriteSheet.prototype.redraw = function () {
+	    var style   = this.element.target.style,
+		    current = this.getAnimation();
+
+		var width  = current.width * 2,
 	        height = current.height * 2;
 
         var px = (current.x + current.offsetX) * 2,
             py = (current.y + current.offsetY) * 2;
 
-        element.style.width  = width.toString() + 'px' || 'auto';
-        element.style.height = height.toString() + 'px' || 'auto';
-        element.style.backgroundPosition = -px.toString() + 'px ' + -py.toString() + 'px';
-		element.style.zIndex = index;
-
-        return this;
-      }
-
-      var o = options;
-
-      for (var key in o) {
-        if (!contains(ANIMATION_OPTIONS_ALLOWED, key)) {
-		  throw new Error('Key "' + key + '" is not allowed!');
-		}
-      }
-
-      o.name = _name;
-
-      var dimensions = ['x', 'y', 'offsetX', 'offsetY'];
-
-      dimensions.forEach(function (d) {
-	    o[d] = o[d] || 0;
-	  });
-
-      if (!o.width) {
-	    throw new Error('Animation without a width!');
-	  }
-
-      o.height = o.height || width;    
-      o.length = o.length || 1;
-      o.delays = o.delays || [];
-
-      while (o.delays.length < o.length) {
-	    o.delays.push(0);
-	  }
-
-      if (new Array(o.x, o.y, o.width, o.height, o.length, o.offsetX, o.offsetY).every(isInt) === false) {
-        throw new Error('Animation dimensions should be integers!');
-      }
-
-      if (!isArray(o.delays) || (isArray(o.delays) && !o.delays.every(isInt))) {
-        throw new Error('Animation delays should be an array of integers!');
-      }
-
-      if (o.delays.length > o.length) {
-	    o.delays = o.delays.slice(0, o.length - 1);
-	  }
-
-      animations[_name] = options;
-
-	  if (animations.default === undefined) {
-	    animations.default = animations[_name];
-	  }
-
-      return this.animation(_name);
-    };
-
-    this.next = function () {
-      delay++;
-
-      if (delay < current.delays[frame]) {
-	    return delay + 1 >= current.delays[frame] && frame + 1 >= current.length;
-	  } else { delay = 0 }
-
-      frame++;
-
-      if (frame >= current.length) {
-	    frame = 0;
-	  }
-
-      var pos = (current.x + (frame * current.width)) * 2;
-
-      element.style.backgroundPosition = -pos.toString() + 'px ' + -current.y.toString() + 'px';
-
-	  return false;
-    };
-
-	this.clone = function () {
-	  return new SpriteSheet(name, animations);
+        style.width  = width.toString() + 'px' || 'auto';
+        style.height = height.toString() + 'px' || 'auto';
+		style.zIndex = this.index;
+        style.backgroundPosition = -px.toString() + 'px ' + -py.toString() + 'px';
 	};
 
-	if (current) {
-	  this.animation('default');
-	}
-  }
+	SpriteSheet.prototype.flip = function () {
+		var classPresent = this.element.hasClass(CLASS_FLIPPED);
 
-  return SpriteSheet;
+		if (this.flipped && classPresent) {
+			this.element.removeClass(CLASS_FLIPPED);
+		} else if (!this.flipped && !classPresent) {
+			this.element.addClass(CLASS_FLIPPED);
+		}
+
+		this.flipped = !this.flipped;
+	};
+
+	return SpriteSheet;
 })();
 var GameObject = (function () {
   var STAGE_WIDTH   = 320,
@@ -293,29 +242,28 @@ var GameObject = (function () {
 	  velocity = Math.min(vmax, Math.abs(velocity)) * (Math.abs(velocity) / (velocity || 1));
 	  scroll -= velocity;
 
-	  if ((k < 0 && sprite.isFlipped()) || (k > 0 && !sprite.isFlipped())) {
+	  if ((k < 0 && sprite.flipped) || (k > 0 && !sprite.flipped)) {
 	    sprite.flip();
       }
 
-	  correctPosition();
-	  correctAnimation();
-    }
-
-    function correctPosition() {
       if (scroll < 0 || scroll > bound) {
 	    scroll = Math.min(bound, Math.max(0, scroll));
 	    velocity = 0;
 	  }
+
+	  correctAnimation();
     }
 
     function correctAnimation() {
-	  if (Math.abs(velocity) <  1 && sprite.animation() === 'walk') {
-	    sprite.animation('idle');
+	  if (Math.abs(velocity) <  1 && sprite.animation === 'walk') {
+	    sprite.animation = 'idle';
       }
 
-	  if (Math.abs(velocity) >= 1 && sprite.animation() === 'idle') {
-	    sprite.animation('walk');
+	  if (Math.abs(velocity) >= 1 && sprite.animation === 'idle') {
+	    sprite.animation = 'walk';
       }
+
+	  sprite.redraw();
     }
   
     this.getSprite = function () {
@@ -354,7 +302,7 @@ var GameObject = (function () {
     };
 
 	this.getDelta = function () {
-	  return (STAGE_WIDTH / 2) - (sprite.dimensions().width / 2)
+	  return (STAGE_WIDTH / 2) - (sprite.getDimensions().width / 2)
 	};
 
 	this.leftCornerReached = function () {
@@ -370,39 +318,42 @@ var GameObject = (function () {
 	    throw new Error('invalid relative object');
 	  }
 
-	  var position   = sprite.position(),
-	      dimensions = sprite.dimensions();
+	  var x = sprite.x,
+	      y = sprite.y;
+	  
+	  var dimensions = sprite.getDimensions();
 
-	  var spriteWidth  = dimensions.width,
-	      spriteHeight = dimensions.height;
+	  y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
 
-	  position.y = STAGE_HEIGHT - spriteHeight - FLOOR_OFFSET;
-
-	  var right = Math.floor(scroll - bound + STAGE_WIDTH - spriteWidth) - 1, // correct missing pixel
+	  var right = Math.floor(scroll - bound + STAGE_WIDTH - dimensions.width) - 1, // correct missing pixel
 	      left  = Math.floor(scroll);
 
 	  if (relative) { // object provided, position sprite relative to it
 	    var _scroll = relative.getScroll();
 
 		if (!relative.leftCornerReached() && !relative.rightCornerReached()) {
-		  position.x = (STAGE_WIDTH / 2) - Math.ceil(sprite.dimensions().width / 2) - Math.floor(_scroll - scroll);
+		  x = (STAGE_WIDTH / 2) - Math.ceil(dimensions.width / 2) - Math.floor(_scroll - scroll);
 		} else {
-		  position.x = relative.rightCornerReached() ? right : left;
+		  x = relative.rightCornerReached() ? right : left;
 		}
 	  } else { // no object provided, position sprite relative to bounds
 	    if (!this.leftCornerReached() && !this.rightCornerReached()) {
-	      position.x = this.getDelta(); // center sprite
+	      x = this.getDelta(); // center sprite
 	    } else {
-	      position.x = this.rightCornerReached() ? right : left;
+	      x = this.rightCornerReached() ? right : left;
 	    }
 	  }
 	  
-	  sprite.position(position.x, position.y);
+	  sprite.x = x;
+	  sprite.y = y;
+
+	  sprite.update();
 	};
   }
 
   return GameObject;
 })();
+
 var Room = (function () {
   var TYPE_DEFAULT  = 'base',
       WIDTH_DEFAULT = 320;
@@ -446,7 +397,7 @@ var Room = (function () {
       }
 
       for (var i = 0; i < depth; ++i) {
-        var t = div(),
+        var t = document.createElement('div'),
 	        filename = depth === 1 ? type : type + '_' + i.toString();
 
         t.style.backgroundImage = 'url(\'dist/i/tiles/' + type + '.png\')';
@@ -470,8 +421,8 @@ var Room = (function () {
   var SPRITES = {};
 
   SPRITES.hero = new SpriteSheet('hero')
-  .animation('idle', { width: 37, height: 72 })
-  .animation('walk', { x: 37, width: 37, height: 72, length: 16 });
+  .addAnimation('idle', { width: 37, height: 72 })
+  .addAnimation('walk', { x: 37, width: 37, height: 72, length: 16 });
 
   var pressed = [],
       sprites = [];
@@ -493,9 +444,9 @@ var Room = (function () {
     if (index !== -1) pressed.splice(index, 1);
   }
 
-  var screen = div(),
-      stage = div(),
-      background = div();
+  var screen     = document.createElement('div'),
+      stage      = document.createElement('div'),
+      background = document.createElement('div');
 
   document.body.appendChild(screen);
 
@@ -520,21 +471,23 @@ var Room = (function () {
 	var children = Array.prototype.slice.call(stage.childNodes, 0);
 
 	loadedObjects.forEach(function (object, i) {
-	  var sprite  = object.getSprite(),
-	      element = sprite.getElement();
+	  var sprite  = object.getSprite();
 
       object.correctPosition(object === activeObject ? null : activeObject);
       sprite.next();
+	  sprite.update();
 
-	  var pos = sprite.position(),
-		  dim = sprite.dimensions();
+	  var width  = sprite.getDimensions().width,
+	      height = sprite.getDimensions().height;
 
-	  var hidden = pos.x + dim.width < 0 || pos.x >= STAGE_WIDTH || pos.y + dim.height < 0 || pos.y >= STAGE_HEIGHT;
+	  var hidden = sprite.x + width < 0 || sprite.x >= STAGE_WIDTH || sprite.y + height < 0 || sprite.y >= STAGE_HEIGHT;
 
-	  if (hidden && contains(children, element)) {
-	    stage.removeChild(element);	// remove hidden elements
-	  } else if (!hidden && !contains(children, element)) {
-	    stage.appendChild(element); // add visible elements
+	  var target = sprite.element.target;
+
+	  if (hidden && contains(children, target)) {
+	    stage.removeChild(target);	// remove hidden elements
+	  } else if (!hidden && !contains(children, target)) {
+	    stage.appendChild(target); // add visible elements
 	  }
 	});
 
@@ -586,17 +539,18 @@ var Room = (function () {
 	loadedObjects = objects;
 	activeObject  = objects[0];
 
-	activeObject.getSprite().index(1);
+	activeObject.getSprite().index = 1;
 
 	loadedObjects.forEach(function (object) {
 	  object.setBound(room.getWidth());
+	  object.getSprite().redraw();
 	});
 
 	currentRoom.getTiles().forEach(function (tile) {
 	  background.appendChild(tile)
 	});
 
-	stage.appendChild(activeObject.getSprite().getElement());
+	stage.appendChild(activeObject.getSprite().element.target);
   }
 
   loadLevel(new Room('blank', null, 840), [
