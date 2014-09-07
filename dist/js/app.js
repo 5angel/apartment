@@ -195,6 +195,356 @@ var SpriteSheet = (function () {
 	return SpriteSheet;
 })();
 var GameObject = (function () {
+	var STAGE_WIDTH   = 320,
+		STAGE_HEIGHT  = 112,
+		FLOOR_OFFSET  = 6
+	var FRICTION = .6;
+	var VELOCITY_STEP_DEFAULT = .4,
+		VELOCITY_MAX_DEFAULT  = 3;
+	var BOUND_MAX = 9007199254740992;
+
+	function GameObject(sprite, vStep, vMax, scroll, bound) {
+		this.sprite = sprite;
+		this.scroll = scroll || 0;
+		this.bound  = bound || BOUND_MAX;
+
+		this.velocity = {
+			step: vStep || VELOCITY_STEP_DEFAULT,
+			max:  vMax || VELOCITY_MAX_DEFAULT,
+			value: 0
+		};
+
+		if (sprite instanceof SpriteSheet === false) {
+			throw new Error('Please provide a sprite!');
+		}
+
+		if (!isNumber(this.scroll)) {
+			throw new Error('GameObject with invalid starting scroll!');
+		} else if (this.scroll < 0) {
+			throw new Error('GameObject scroll cannot be lower than 0!');
+		}
+
+		if (!isInt(this.bound)) {
+			throw new Error('GameObject with invalid bound!');
+		}
+
+		if (!isNumber(this.velocity.step) || !isNumber(this.velocity.max)) {
+			throw new Error('GameObject with invalid velocity data!');
+		}
+
+		this.getDelta = function () {
+			return (STAGE_WIDTH / 2) - (this.sprite.getDimensions().width / 2)
+		};
+	}
+
+	GameObject.prototype.push = function (k, value) {
+		k = k || 1;
+		value = value || this.velocity.step;
+
+		if (!isNumber(k)) {
+			throw new Error('Push with invalid factor of "' + k.toString() + '"!');
+		} else if (!isNumber(value)) {
+			throw new Error('Push with invalid value of "' + value.toString() + '"!');
+		}
+
+		value *= k;
+
+		var v = this.velocity;
+
+		v.value += value;
+
+		v.value = Math.min(v.max, Math.abs(v.value)) * (Math.abs(v.value) / (v.value || 1));
+		this.scroll -= v.value;
+
+		var flipped = this.sprite.flipped;
+
+		if ((k < 0 && flipped) || (k > 0 && !flipped)) {
+			this.sprite.flip();
+		}
+
+		if (this.scroll < 0 || this.scroll > this.bound) {
+			this.scroll = Math.min(this.bound, Math.max(0, this.scroll));
+			v.value = 0;
+		}
+
+		this.correctAnimation();
+	};
+
+    GameObject.prototype.wait = function () {
+		this.velocity.value *= FRICTION;
+
+		if (Math.abs(this.velocity.value) < .1) {
+			this.velocity.value = 0;
+		}
+
+		this.scroll -= this.velocity.value;
+
+		this.correctAnimation();
+    };
+
+    GameObject.prototype.correctAnimation = function () {
+		if (Math.abs(this.velocity.value) <  1 && this.sprite.animation === 'walk') {
+			this.sprite.animation = 'idle';
+		}
+
+		if (Math.abs(this.velocity.value) >= 1 && this.sprite.animation === 'idle') {
+			this.sprite.animation = 'walk';
+		}
+
+		this.sprite.redraw();
+    };
+
+	GameObject.prototype.leftCornerReached = function () {
+	  return this.scroll < this.getDelta();
+	};
+
+	GameObject.prototype.rightCornerReached = function () {
+		return this.scroll + this.getDelta() >= this.bound;
+	};
+
+	GameObject.prototype.correctPosition = function (relative) {
+		if (relative !== null && !(relative instanceof GameObject))	{
+			throw new Error('invalid relative object');
+		}
+
+		var dimensions = this.sprite.getDimensions();
+
+		this.sprite.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
+
+		var right = Math.floor(this.scroll - this.bound + STAGE_WIDTH - dimensions.width) - 1, // correct missing pixel
+			left  = Math.floor(this.scroll);
+
+		if (relative) { // object provided, position sprite relative to it
+			if (!relative.leftCornerReached() && !relative.rightCornerReached()) {
+				this.sprite.x = (STAGE_WIDTH / 2) - Math.ceil(dimensions.width / 2) - Math.floor(relative.scroll - this.scroll);
+			} else {
+				this.sprite.x = relative.rightCornerReached() ? right : left;
+			}
+		} else { // no object provided, position sprite relative to bounds
+			if (!this.leftCornerReached() && !this.rightCornerReached()) {
+				this.sprite.x = this.getDelta(); // center sprite
+			} else {
+				this.sprite.x = this.rightCornerReached() ? right : left;
+			}
+		}
+
+		this.sprite.update();
+	};
+
+	return GameObject;
+})()
+
+var Room = (function () {
+	var WIDTH_DEFAULT = 320;
+	var TYPE_DEFAULT = 'base',
+		SRC_BASE     = 'url(\'dist/i/tiles/',
+		SRC_TAIL     = '.png\')',
+		CLASS_BASE   = 'background__tile';
+
+	function Room(name, type, width, depth) {
+		if (!isValidString(name)) {
+			throw new Error('Room without a name!');
+		}
+
+		this.name  = name;
+		this.type  = type  || TYPE_DEFAULT;
+		this.width = width || WIDTH_DEFAULT;
+		this.depth = depth || 1;
+
+		if (!isValidString(this.type)) {
+			throw new Error('Room with invalid type of "' + this.type + '"!');
+		}
+
+		if (!isInt(this.width)) {
+			throw new Error('Room with invalid width of "' + this.width + '"!');
+		}
+
+		if (!isInt(this.depth)) {
+			throw new Error('Room with invalid depth of "' + this.depth + '"!');
+		}
+
+		this.width = Math.max(WIDTH_DEFAULT, this.width);
+	}
+
+	Room.prototype.getTiles = function () {
+		var tiles = [];
+
+		for (var i = 0; i < this.depth; ++i) {
+			var t = document.createElement('div'),
+				filename = this.depth === 1 ? this.type : this.type + '_' + i.toString();
+
+			t.style.backgroundImage = SRC_BASE + this.type + SRC_TAIL;
+			t.setAttribute('class', CLASS_BASE);
+			tiles.push(t);
+		}
+
+		return tiles;
+	};
+
+	return Room;
+})();
+(function () {
+	var STAGE_WIDTH   = 320,
+		STAGE_HEIGHT  = 112,
+		FRAME_STEP = 80;
+
+	// define sprites
+	var SPRITES = {};
+
+	SPRITES.hero = new SpriteSheet('hero')
+		.addAnimation('idle', { width: 37, height: 72 })
+		.addAnimation('walk', { x: 37, width: 37, height: 72, length: 16 });
+
+	var pressed = [],
+		sprites = [];
+
+	function getKeyAction(value) {
+		if (value === 87 || value === 38) {
+			return 'up';
+		} else if (value === 68 || value === 39) {
+			return 'right';
+		} else if (value === 83 || value === 40) {
+			return 'down';
+		} else if (value === 65 || value === 37) {
+			return 'left';
+		}
+  }
+
+	function onKeyDown(e) {
+		var pending = getKeyAction(e.keyCode);
+
+		if (pressed.indexOf(pending) === -1) {
+			pressed.push(pending);
+		}
+	}
+
+	function onKeyUp(e) {
+		var index = pressed.indexOf(getKeyAction(e.keyCode));
+
+		if (index !== -1) {
+			pressed.splice(index, 1);
+		}
+	}
+
+	var screen     = document.createElement('div'),
+		stage      = document.createElement('div'),
+		background = document.createElement('div');
+
+	document.body.appendChild(screen);
+
+	screen.setAttribute('id', 'screen');
+	screen.setAttribute('tabindex', 0);
+	screen.appendChild(stage);
+	screen.appendChild(background);
+	screen.addEventListener('keydown', onKeyDown);
+	screen.addEventListener('keyup', onKeyUp);
+
+	stage.setAttribute('class', 'stage');
+
+	background.setAttribute('class', 'background');
+ 
+	var currentRoom, loadedObjects, activeObject;
+
+	function updateView() {
+		var scroll = activeObject.scroll,
+			delta  = Math.floor(activeObject.getDelta());
+
+		var children = Array.prototype.slice.call(stage.childNodes, 0);
+
+		loadedObjects.forEach(function (object, i) {
+			object.correctPosition(object === activeObject ? null : activeObject);
+			object.sprite.next();
+			object.sprite.update();
+
+			var x = object.sprite.x,
+			    y = object.sprite.y;
+			var dimensions = object.sprite.getDimensions();
+
+			var hidden = x + dimensions.width < 0 || x >= STAGE_WIDTH || y + dimensions.height < 0 || y >= STAGE_HEIGHT;
+
+			var target = object.sprite.element.target;
+
+			if (hidden && contains(children, target)) {
+				stage.removeChild(target);	// remove hidden elements
+			} else if (!hidden && !contains(children, target)) {
+				stage.appendChild(target); // add visible elements
+			}
+		});
+
+		var x = 0;
+		
+		if (scroll + delta >= currentRoom.width) {
+			x = currentRoom.width - (delta * 2);
+		} else if (scroll >= delta) {
+			x = Math.floor(scroll) - delta;
+		}
+
+		var tiles = currentRoom.getTiles();
+
+		tiles.forEach(function (t, i) {
+			var p = -Math.floor(x / (tiles.length - i)) * 2;
+
+			t.style.backgroundPosition = p.toString() + 'px 0px';;
+		});
+	}
+
+	function nextFrame() {
+		var action = pressed[0];
+
+		switch (action) {
+			case 'right':
+				activeObject.push(-1);
+				break;
+			case 'left':
+				activeObject.push();
+				break;
+			default:
+				activeObject.wait();
+				break;
+		}
+
+		updateView();
+	}
+
+	function loadLevel(room, objects) {
+		if (room instanceof Room === false ) {
+			throw new Error('Please provide a room!');
+		}
+
+		var o = objects;
+
+		if (!isArray(o) || (isArray(o) && (o.length === 0 && !o.every(function (t) { return t instanceof GameObject })))) {
+			throw new Error('Please provide a correct array of objects!');
+		}
+
+		currentRoom   = room;
+		loadedObjects = objects;
+		activeObject  = objects[0];
+
+		activeObject.sprite.index = 1;
+
+		loadedObjects.forEach(function (object) {
+			object.bound = room.width;
+			object.sprite.redraw();
+		});
+
+		currentRoom.getTiles().forEach(function (tile) {
+			background.appendChild(tile)
+		});
+
+		stage.appendChild(activeObject.sprite.element.target);
+	}
+
+	loadLevel(new Room('blank', null, 840), [
+		new GameObject(SPRITES.hero, null, null, 740),
+		new GameObject(SPRITES.hero.clone(), null, null, 40),
+		new GameObject(SPRITES.hero.clone(), null, null, 400),
+		new GameObject(SPRITES.hero.clone(), null, null, 780)
+	]);
+
+	setInterval(nextFrame, FRAME_STEP);
+})();
+var GameObject = (function () {
   var STAGE_WIDTH   = 320,
 	  STAGE_HEIGHT  = 112,
 	  FLOOR_OFFSET  = 6
@@ -204,6 +554,7 @@ var GameObject = (function () {
   var BOUND_MAX = 9007199254740992;
 
   function GameObject(sprite, vstep, vmax, scroll, bound) {
+  	console.log(arguments)
     if (sprite instanceof SpriteSheet === false) {
 	  throw new Error('Please provide a sprite!');
 	}
@@ -352,213 +703,4 @@ var GameObject = (function () {
   }
 
   return GameObject;
-})();
-
-var Room = (function () {
-  var TYPE_DEFAULT  = 'base',
-      WIDTH_DEFAULT = 320;
-
-  function Room(name, type, width, depth) {
-    if (!isValidString(name)) {
-	  throw new Error('Room without a name!');
-	}
-
-    type  = type  || TYPE_DEFAULT;
-    width = width || WIDTH_DEFAULT;
-    depth = depth || 1;
-
-    if (!isValidString(type)) {
-	  throw new Error('Room with invalid type of "' + type + '"!');
-	}
-
-    if (!isInt(width)) {
-	  throw new Error('Room with invalid width of "' + width + '"!');
-	}
-
-    if (!isInt(depth)) {
-	  throw new Error('Room with invalid depth of "' + depth + '"!');
-	}
-
-    width = Math.max(WIDTH_DEFAULT, width);
-
-    var tiles = [];
-
-    this.getName = function () {
-	  return name;
-	};
-
-    this.getWidth = function () {
-	  return width;
-	};
-
-    this.getTiles = function () {
-      if (tiles.length > 0) {
-	    return tiles;
-      }
-
-      for (var i = 0; i < depth; ++i) {
-        var t = document.createElement('div'),
-	        filename = depth === 1 ? type : type + '_' + i.toString();
-
-        t.style.backgroundImage = 'url(\'dist/i/tiles/' + type + '.png\')';
-
-        t.setAttribute('class', 'background__tile');
-        tiles.push(t);
-	  }
-
-      return tiles;
-    };
-  }
-
-  return Room;
-})();
-(function () {
-  var STAGE_WIDTH   = 320,
-	  STAGE_HEIGHT  = 112,
-      FRAME_STEP = 80;
-
-  // define sprites
-  var SPRITES = {};
-
-  SPRITES.hero = new SpriteSheet('hero')
-  .addAnimation('idle', { width: 37, height: 72 })
-  .addAnimation('walk', { x: 37, width: 37, height: 72, length: 16 });
-
-  var pressed = [],
-      sprites = [];
-
-  function getKeyAction(value) {
-    if (value === 87 || value === 38) { return 'up' }
-    else if (value === 68 || value === 39) { return 'right' }
-    else if (value === 83 || value === 40) { return 'down' }
-    else if (value === 65 || value === 37) { return 'left' }
-  }
-
-  function onKeyDown(e) {
-    var pending = getKeyAction(e.keyCode);
-    if (pressed.indexOf(pending) === -1) { pressed.push(pending) }
-  }
-
-  function onKeyUp(e) {
-    var index = pressed.indexOf(getKeyAction(e.keyCode));
-    if (index !== -1) pressed.splice(index, 1);
-  }
-
-  var screen     = document.createElement('div'),
-      stage      = document.createElement('div'),
-      background = document.createElement('div');
-
-  document.body.appendChild(screen);
-
-  screen.setAttribute('id', 'screen');
-  screen.setAttribute('tabindex', 0);
-  screen.appendChild(stage);
-  screen.appendChild(background);
-  screen.addEventListener('keydown', onKeyDown);
-  screen.addEventListener('keyup', onKeyUp);
-
-  stage.setAttribute('class', 'stage');
-
-  background.setAttribute('class', 'background');
- 
-  var currentRoom, loadedObjects, activeObject;
-
-  function updateView(scroll, width, delta) {
-	var scroll = activeObject.getScroll(),
-	    delta  = Math.floor(activeObject.getDelta()),
-	    width  = currentRoom.getWidth();
-
-	var children = Array.prototype.slice.call(stage.childNodes, 0);
-
-	loadedObjects.forEach(function (object, i) {
-	  var sprite  = object.getSprite();
-
-      object.correctPosition(object === activeObject ? null : activeObject);
-      sprite.next();
-	  sprite.update();
-
-	  var width  = sprite.getDimensions().width,
-	      height = sprite.getDimensions().height;
-
-	  var hidden = sprite.x + width < 0 || sprite.x >= STAGE_WIDTH || sprite.y + height < 0 || sprite.y >= STAGE_HEIGHT;
-
-	  var target = sprite.element.target;
-
-	  if (hidden && contains(children, target)) {
-	    stage.removeChild(target);	// remove hidden elements
-	  } else if (!hidden && !contains(children, target)) {
-	    stage.appendChild(target); // add visible elements
-	  }
-	});
-
-	var x = 0;
-		
-	if (scroll + delta >= width) {
-	  x = width - (delta * 2);
-	} else if (scroll >= delta) {
-	  x = Math.floor(scroll) - delta;
-	}
-
-	var tiles = currentRoom.getTiles();
-
-    tiles.forEach(function (t, i) {
-      var p = -Math.floor(x / (tiles.length - i)) * 2;
-
-      t.style.backgroundPosition = p.toString() + 'px 0px';;
-	});
-  }
-
-  function nextFrame() {
-    var action = pressed[0];
-
-    switch (action) {
-      case 'right':
-        activeObject.pushRight();
-        break;
-      case 'left':
-        activeObject.pushLeft();
-        break;
-      default:
-        activeObject.wait();
-        break;
-    }
-
-	updateView();
-  }
-
-  function loadLevel(room, objects) {
-    if (room instanceof Room === false ) { throw new Error('Please provide a room!') }
-
-	var o = objects;
-
-    if (!isArray(o) || (isArray(o) && (o.length === 0 && !o.every(function (t) { return t instanceof GameObject })))) {
-      throw new Error('Please provide a correct array of objects!');
-    }
-
-    currentRoom   = room;
-	loadedObjects = objects;
-	activeObject  = objects[0];
-
-	activeObject.getSprite().index = 1;
-
-	loadedObjects.forEach(function (object) {
-	  object.setBound(room.getWidth());
-	  object.getSprite().redraw();
-	});
-
-	currentRoom.getTiles().forEach(function (tile) {
-	  background.appendChild(tile)
-	});
-
-	stage.appendChild(activeObject.getSprite().element.target);
-  }
-
-  loadLevel(new Room('blank', null, 840), [
-    new GameObject(SPRITES.hero, null, null, 740),
-	new GameObject(SPRITES.hero.clone(), null, null, 40),
-	new GameObject(SPRITES.hero.clone(), null, null, 400),
-	new GameObject(SPRITES.hero.clone(), null, null, 780)
-  ]);
-
-  setInterval(nextFrame, FRAME_STEP);
 })();
