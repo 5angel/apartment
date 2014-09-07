@@ -154,7 +154,7 @@
 		new GameObject(SPRITES.hero, null, null, 740),
 		new GameObject(SPRITES.hero.clone(), null, null, 40),
 		new GameObject(SPRITES.hero.clone(), null, null, 400),
-		new GameObject(SPRITES.hero.clone(), null, null, 780)
+		new ActionObject(SPRITES.hero.clone(), null, null, 780)
 	]);
 
 	setInterval(nextFrame, FRAME_STEP);

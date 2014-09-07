@@ -11,3 +11,11 @@ function contains(array) {
   var args = Array.prototype.slice.call(arguments).slice(1);
   return args.every(function (item) { return array.indexOf(item) !== -1 });
 }
+
+function extend(Child, Parent) {
+	var F = function () { }
+	F.prototype = Parent.prototype
+	Child.prototype = new F();
+	Child.prototype.constructor = Child
+	Child.super = Parent.prototype
+}
