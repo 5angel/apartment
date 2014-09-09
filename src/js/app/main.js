@@ -61,21 +61,19 @@
 	var currentRoom, loadedObjects, activeObject;
 
 	function updateView() {
-		var scroll = activeObject.scroll,
-			delta  = Math.floor(activeObject.getDelta());
-
 		var children = Array.prototype.slice.call(stage.childNodes, 0);
 
 		loadedObjects.forEach(function (object, i) {
-			object.correctPosition(object === activeObject ? null : activeObject);
+			object.correctSprite(currentRoom.width, object === activeObject ? null : activeObject);
 			object.sprite.next();
 			object.sprite.update();
 
 			var x = object.sprite.x,
 			    y = object.sprite.y;
-			var dimensions = object.sprite.getDimensions();
+			var width  = object.sprite.getFrameWidth(),
+				height = object.sprite.getFrameHeight();
 
-			var hidden = x + dimensions.width < 0 || x >= STAGE_WIDTH || y + dimensions.height < 0 || y >= STAGE_HEIGHT;
+			var hidden = x + width < 0 || x >= STAGE_WIDTH || y + height < 0 || y >= STAGE_HEIGHT;
 
 			var target = object.sprite.element.target;
 
@@ -86,20 +84,20 @@
 			}
 		});
 
+		var delta  = Math.floor(activeObject.getDeltaWidth(2));
+
 		var x = 0;
-		
-		if (scroll + delta >= currentRoom.width) {
+
+		if (activeObject.scroll + delta >= currentRoom.width) {
 			x = currentRoom.width - (delta * 2);
-		} else if (scroll >= delta) {
-			x = Math.floor(scroll) - delta;
+		} else if (activeObject.scroll >= delta) {
+			x = Math.floor(activeObject.scroll) - delta;
 		}
 
-		var tiles = currentRoom.getTiles();
+		currentRoom.tiles.forEach(function (t, i, array) {
+			var p = -Math.floor(x / (array.length - i)) * 2;
 
-		tiles.forEach(function (t, i) {
-			var p = -Math.floor(x / (tiles.length - i)) * 2;
-
-			t.style.backgroundPosition = p.toString() + 'px 0px';;
+			t.style.backgroundPosition = p.toString() + 'px 0px';
 		});
 	}
 
@@ -143,18 +141,18 @@
 			object.sprite.redraw();
 		});
 
-		currentRoom.getTiles().forEach(function (tile) {
-			background.appendChild(tile)
+		currentRoom.tiles.forEach(function (tile) {
+			background.appendChild(tile);
 		});
 
 		stage.appendChild(activeObject.sprite.element.target);
 	}
 
 	loadLevel(new Room('blank', null, 840), [
-		new GameObject(SPRITES.hero, null, null, 740),
-		new GameObject(SPRITES.hero.clone(), null, null, 40),
-		new GameObject(SPRITES.hero.clone(), null, null, 400),
-		new ActionObject(SPRITES.hero.clone(), null, null, 780)
+		new DynamicObject(SPRITES.hero, 740),
+		new DynamicObject(SPRITES.hero.clone(), 40),
+		new DynamicObject(SPRITES.hero.clone(), 400),
+		new DynamicObject(SPRITES.hero.clone(), 780)
 	]);
 
 	setInterval(nextFrame, FRAME_STEP);

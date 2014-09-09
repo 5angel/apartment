@@ -1,8 +1,4 @@
 module.exports = function(grunt) {
-  var SOURCE = 'src/js/',
-      NAMES  = ['common', 'spriteSheet', 'gameObject', 'room', 'main'],
-	  FILES  = NAMES.map(function (name) { return SOURCE + name + '.js'});
-
   // configure the tasks
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
@@ -24,11 +20,13 @@ module.exports = function(grunt) {
         src: [
 		  'src/js/app/common.js',
 		  'src/js/classes/richHTMLElement.js',
-		  'src/js/classes/spritesheet.js',
+		  'src/js/classes/animation.js',
+		  'src/js/classes/spriteSheet.js',
 		  'src/js/classes/gameObject.js',
-		  'src/js/classes/*.js',
+		  'src/js/classes/dynamicObject.js',
+		  'src/js/classes/entity.js',
+		  'src/js/classes/room.js',
 		  'src/js/app/main.js',
-		  'src/js/**/*.js'
 		],
         dest: 'dist/js/app.js',
       },

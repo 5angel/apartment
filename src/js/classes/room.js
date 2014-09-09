@@ -5,6 +5,21 @@ var Room = (function () {
 		SRC_TAIL     = '.png\')',
 		CLASS_BASE   = 'background__tile';
 
+	function createTiles(count, type) {
+		var tiles = [];
+
+		for (var i = 0; i < count; ++i) {
+			var t = document.createElement('div'),
+				filename = count === 1 ? type : type + '_' + i.toString();
+
+			t.style.backgroundImage = SRC_BASE + type+ SRC_TAIL;
+			t.setAttribute('class', CLASS_BASE);
+			tiles.push(t);
+		}
+
+		return tiles;
+	}
+
 	function Room(name, type, width, depth) {
 		if (!isValidString(name)) {
 			throw new Error('Room without a name!');
@@ -28,22 +43,8 @@ var Room = (function () {
 		}
 
 		this.width = Math.max(WIDTH_DEFAULT, this.width);
+		this.tiles = createTiles(this.depth, this.type);
 	}
-
-	Room.prototype.getTiles = function () {
-		var tiles = [];
-
-		for (var i = 0; i < this.depth; ++i) {
-			var t = document.createElement('div'),
-				filename = this.depth === 1 ? this.type : this.type + '_' + i.toString();
-
-			t.style.backgroundImage = SRC_BASE + this.type + SRC_TAIL;
-			t.setAttribute('class', CLASS_BASE);
-			tiles.push(t);
-		}
-
-		return tiles;
-	};
 
 	return Room;
 })();

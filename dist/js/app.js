@@ -12,12 +12,12 @@ function contains(array) {
   return args.every(function (item) { return array.indexOf(item) !== -1 });
 }
 
-function extend(Child, Parent) {
-	var F = function () { }
-	F.prototype = Parent.prototype
+function inherits(Child, Parent) {
+	var F = function () {};
+	F.prototype = Parent.prototype;
 	Child.prototype = new F();
-	Child.prototype.constructor = Child
-	Child.super = Parent.prototype
+	Child.prototype.constructor = Child;
+	Child.superclass = Parent.prototype;
 }
 var RichHTMLElement = (function () {
   function RichHTMLElement(element) {
@@ -56,6 +56,13 @@ var RichHTMLElement = (function () {
   return RichHTMLElement;
 })();
 
+var Animation = (function () {
+	function Animation() {
+		
+	}
+
+	return Animation;
+})();
 var SpriteSheet = (function () {
 	var SRC_BASE = 'url(\'dist/i/sprites/',
 	    SRC_TAIL = '.png\')';
@@ -132,14 +139,12 @@ var SpriteSheet = (function () {
 		};
 	}
 
-	SpriteSheet.prototype.getDimensions = function () {
-		var animation = this.getAnimation(),
-		    dimensions = {
-				width: animation.width,
-				height: animation.height
-			};
+	SpriteSheet.prototype.getFrameWidth = function () {
+		return this.getAnimation().width;
+	};
 
-		return dimensions;
+	SpriteSheet.prototype.getFrameHeight = function () {
+		return this.getAnimation().height;
 	};
 
 	SpriteSheet.prototype.next = function () {
@@ -203,18 +208,98 @@ var SpriteSheet = (function () {
 	return SpriteSheet;
 })();
 var GameObject = (function () {
-	var STAGE_WIDTH   = 320,
-		STAGE_HEIGHT  = 112,
-		FLOOR_OFFSET  = 6
+	var STAGE_WIDTH  = 320,
+		STAGE_HEIGHT = 112,
+		FLOOR_OFFSET = 6;
+
+	function checkSprite(sprite) {
+		if (!(sprite instanceof SpriteSheet)) {
+			throw new Error('invalid sprite');
+		}
+	}
+
+	function checkScroll(scroll) {
+		if (!isNumber(scroll)) {
+			throw new Error('scroll value should be a number');
+		} else if (scroll < 0) {
+			throw new Error('scroll value cannot be lower than 0');
+		}
+	}
+
+	function GameObject(sprite, scroll) {
+		this.sprite = sprite;
+		this.scroll = scroll || 0;
+
+		checkSprite(this.sprite);
+		checkScroll(this.scroll);
+
+		this.getDeltaWidth = function (k) {
+			k = k || 1;
+
+			return (STAGE_WIDTH / k) - Math.ceil(this.sprite.getFrameWidth() / k);
+		};
+
+		this.getDeltaHeight = function (k) {
+			k = k || 1;
+
+			return (STAGE_HEIGHT / k) - Math.ceil(this.sprite.getFrameHeight() / k) - FLOOR_OFFSET;
+		};
+	}
+
+	GameObject.prototype.leftCornerReached = function () {
+	  return this.scroll < this.getDeltaWidth(2);
+	};
+
+	GameObject.prototype.rightCornerReached = function (length) {
+		return this.scroll + this.getDeltaWidth(2) >= length;
+	};
+
+	GameObject.prototype.correctSprite = function (length, relative) {
+		if (relative !== null && !(relative instanceof GameObject))	{
+			throw new Error('invalid relative object');
+		}
+
+		this.sprite.y = this.getDeltaHeight();
+
+		var rightmost = Math.floor(this.scroll + this.getDeltaWidth() - length) - 1, // correct missing pixel
+			leftmost  = Math.floor(this.scroll);
+
+		if (relative) { // object provided, position sprite relative to it
+			if (!relative.leftCornerReached() && !relative.rightCornerReached(length)) {
+				this.sprite.x = this.getDeltaWidth(2) - Math.floor(relative.scroll - this.scroll);
+			} else {
+				this.sprite.x = relative.rightCornerReached(length) ? rightmost : leftmost;
+			}
+		} else { // no object provided, position sprite relative to bounds
+			if (!this.leftCornerReached() && !this.rightCornerReached(length)) {
+				this.sprite.x = this.getDeltaWidth(2); // center sprite
+			} else {
+				this.sprite.x = this.rightCornerReached(length) ? rightmost : leftmost;
+			}
+		}
+
+		this.sprite.update();
+	};
+
+	return GameObject;
+})();
+var DynamicObject = (function () {
+	'use strict';
+
 	var FRICTION = .6;
 	var VELOCITY_STEP_DEFAULT = .4,
 		VELOCITY_MAX_DEFAULT  = 3;
-	var BOUND_MAX = 9007199254740992;
 
-	function GameObject(sprite, vStep, vMax, scroll, bound) {
-		this.sprite = sprite;
-		this.scroll = scroll || 0;
-		this.bound  = bound || BOUND_MAX;
+	function checkVelocity(v) {
+		if (!isNumber(v.step)) {
+			throw new Error('velocity with invalid step"');
+		} else if (!isNumber(v.step)) {
+			throw new Error('velocity with invalid maximum"');
+		}
+	}
+
+	function DynamicObject(sprite, scroll, vStep, vMax) {
+		DynamicObject.superclass.constructor.apply(this, arguments);
 
 		this.velocity = {
 			step: vStep || VELOCITY_STEP_DEFAULT,
@@ -222,37 +307,19 @@ var GameObject = (function () {
 			value: 0
 		};
 
-		if (sprite instanceof SpriteSheet === false) {
-			throw new Error('Please provide a sprite!');
-		}
-
-		if (!isNumber(this.scroll)) {
-			throw new Error('GameObject with invalid starting scroll!');
-		} else if (this.scroll < 0) {
-			throw new Error('GameObject scroll cannot be lower than 0!');
-		}
-
-		if (!isInt(this.bound)) {
-			throw new Error('GameObject with invalid bound!');
-		}
-
-		if (!isNumber(this.velocity.step) || !isNumber(this.velocity.max)) {
-			throw new Error('GameObject with invalid velocity data!');
-		}
-
-		this.getDelta = function () {
-			return (STAGE_WIDTH / 2) - (this.sprite.getDimensions().width / 2)
-		};
+		checkVelocity(this.velocity)
 	}
 
-	GameObject.prototype.push = function (k, value) {
+	inherits(DynamicObject, GameObject);
+
+	DynamicObject.prototype.push = function (k, value) {
 		k = k || 1;
 		value = value || this.velocity.step;
 
 		if (!isNumber(k)) {
-			throw new Error('Push with invalid factor of "' + k.toString() + '"!');
+			throw new Error('push with invalid factor"');
 		} else if (!isNumber(value)) {
-			throw new Error('Push with invalid value of "' + value.toString() + '"!');
+			throw new Error('push with invalid value"');
 		}
 
 		value *= k;
@@ -278,7 +345,7 @@ var GameObject = (function () {
 		this.correctAnimation();
 	};
 
-    GameObject.prototype.wait = function () {
+    DynamicObject.prototype.wait = function () {
 		this.velocity.value *= FRICTION;
 
 		if (Math.abs(this.velocity.value) < .1) {
@@ -290,7 +357,7 @@ var GameObject = (function () {
 		this.correctAnimation();
     };
 
-    GameObject.prototype.correctAnimation = function () {
+    DynamicObject.prototype.correctAnimation = function () {
 		if (Math.abs(this.velocity.value) <  1 && this.sprite.animation === 'walk') {
 			this.sprite.animation = 'idle';
 		}
@@ -302,53 +369,16 @@ var GameObject = (function () {
 		this.sprite.redraw();
     };
 
-	GameObject.prototype.leftCornerReached = function () {
-	  return this.scroll < this.getDelta();
-	};
-
-	GameObject.prototype.rightCornerReached = function () {
-		return this.scroll + this.getDelta() >= this.bound;
-	};
-
-	GameObject.prototype.correctPosition = function (relative) {
-		if (relative !== null && !(relative instanceof GameObject))	{
-			throw new Error('invalid relative object');
-		}
-
-		var dimensions = this.sprite.getDimensions();
-
-		this.sprite.y = STAGE_HEIGHT - dimensions.height - FLOOR_OFFSET;
-
-		var right = Math.floor(this.scroll - this.bound + STAGE_WIDTH - dimensions.width) - 1, // correct missing pixel
-			left  = Math.floor(this.scroll);
-
-		if (relative) { // object provided, position sprite relative to it
-			if (!relative.leftCornerReached() && !relative.rightCornerReached()) {
-				this.sprite.x = (STAGE_WIDTH / 2) - Math.ceil(dimensions.width / 2) - Math.floor(relative.scroll - this.scroll);
-			} else {
-				this.sprite.x = relative.rightCornerReached() ? right : left;
-			}
-		} else { // no object provided, position sprite relative to bounds
-			if (!this.leftCornerReached() && !this.rightCornerReached()) {
-				this.sprite.x = this.getDelta(); // center sprite
-			} else {
-				this.sprite.x = this.rightCornerReached() ? right : left;
-			}
-		}
-
-		this.sprite.update();
-	};
-
-	return GameObject;
-})()
-var ActionObject = (function () {
-	function ActionObject(sprite, vStep, vMax, scroll, bound, actions) {
-		ActionObject.super.constructor.apply(this, arguments)
+	return DynamicObject;
+})();
+var Entyty = (function () {
+	function Entity() {
+		Entity.uber.constructor.apply(this, arguments);
 	}
 
-	extend(ActionObject, GameObject);
-	
-	return ActionObject;
+	inherits(Entity, DynamicObject);
+
+	return Entity;
 })();
 var Room = (function () {
 	var WIDTH_DEFAULT = 320;
@@ -356,6 +386,21 @@ var Room = (function () {
 		SRC_BASE     = 'url(\'dist/i/tiles/',
 		SRC_TAIL     = '.png\')',
 		CLASS_BASE   = 'background__tile';
+
+	function createTiles(count, type) {
+		var tiles = [];
+
+		for (var i = 0; i < count; ++i) {
+			var t = document.createElement('div'),
+				filename = count === 1 ? type : type + '_' + i.toString();
+
+			t.style.backgroundImage = SRC_BASE + type+ SRC_TAIL;
+			t.setAttribute('class', CLASS_BASE);
+			tiles.push(t);
+		}
+
+		return tiles;
+	}
 
 	function Room(name, type, width, depth) {
 		if (!isValidString(name)) {
@@ -380,22 +425,8 @@ var Room = (function () {
 		}
 
 		this.width = Math.max(WIDTH_DEFAULT, this.width);
+		this.tiles = createTiles(this.depth, this.type);
 	}
-
-	Room.prototype.getTiles = function () {
-		var tiles = [];
-
-		for (var i = 0; i < this.depth; ++i) {
-			var t = document.createElement('div'),
-				filename = this.depth === 1 ? this.type : this.type + '_' + i.toString();
-
-			t.style.backgroundImage = SRC_BASE + this.type + SRC_TAIL;
-			t.setAttribute('class', CLASS_BASE);
-			tiles.push(t);
-		}
-
-		return tiles;
-	};
 
 	return Room;
 })();
@@ -462,21 +493,19 @@ var Room = (function () {
 	var currentRoom, loadedObjects, activeObject;
 
 	function updateView() {
-		var scroll = activeObject.scroll,
-			delta  = Math.floor(activeObject.getDelta());
-
 		var children = Array.prototype.slice.call(stage.childNodes, 0);
 
 		loadedObjects.forEach(function (object, i) {
-			object.correctPosition(object === activeObject ? null : activeObject);
+			object.correctSprite(currentRoom.width, object === activeObject ? null : activeObject);
 			object.sprite.next();
 			object.sprite.update();
 
 			var x = object.sprite.x,
 			    y = object.sprite.y;
-			var dimensions = object.sprite.getDimensions();
+			var width  = object.sprite.getFrameWidth(),
+				height = object.sprite.getFrameHeight();
 
-			var hidden = x + dimensions.width < 0 || x >= STAGE_WIDTH || y + dimensions.height < 0 || y >= STAGE_HEIGHT;
+			var hidden = x + width < 0 || x >= STAGE_WIDTH || y + height < 0 || y >= STAGE_HEIGHT;
 
 			var target = object.sprite.element.target;
 
@@ -487,20 +516,20 @@ var Room = (function () {
 			}
 		});
 
+		var delta  = Math.floor(activeObject.getDeltaWidth(2));
+
 		var x = 0;
-		
-		if (scroll + delta >= currentRoom.width) {
+
+		if (activeObject.scroll + delta >= currentRoom.width) {
 			x = currentRoom.width - (delta * 2);
-		} else if (scroll >= delta) {
-			x = Math.floor(scroll) - delta;
+		} else if (activeObject.scroll >= delta) {
+			x = Math.floor(activeObject.scroll) - delta;
 		}
 
-		var tiles = currentRoom.getTiles();
+		currentRoom.tiles.forEach(function (t, i, array) {
+			var p = -Math.floor(x / (array.length - i)) * 2;
 
-		tiles.forEach(function (t, i) {
-			var p = -Math.floor(x / (tiles.length - i)) * 2;
-
-			t.style.backgroundPosition = p.toString() + 'px 0px';;
+			t.style.backgroundPosition = p.toString() + 'px 0px';
 		});
 	}
 
@@ -544,18 +573,18 @@ var Room = (function () {
 			object.sprite.redraw();
 		});
 
-		currentRoom.getTiles().forEach(function (tile) {
-			background.appendChild(tile)
+		currentRoom.tiles.forEach(function (tile) {
+			background.appendChild(tile);
 		});
 
 		stage.appendChild(activeObject.sprite.element.target);
 	}
 
 	loadLevel(new Room('blank', null, 840), [
-		new GameObject(SPRITES.hero, null, null, 740),
-		new GameObject(SPRITES.hero.clone(), null, null, 40),
-		new GameObject(SPRITES.hero.clone(), null, null, 400),
-		new ActionObject(SPRITES.hero.clone(), null, null, 780)
+		new DynamicObject(SPRITES.hero, 740),
+		new DynamicObject(SPRITES.hero.clone(), 40),
+		new DynamicObject(SPRITES.hero.clone(), 400),
+		new DynamicObject(SPRITES.hero.clone(), 780)
 	]);
 
 	setInterval(nextFrame, FRAME_STEP);

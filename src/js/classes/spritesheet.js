@@ -74,14 +74,12 @@ var SpriteSheet = (function () {
 		};
 	}
 
-	SpriteSheet.prototype.getDimensions = function () {
-		var animation = this.getAnimation(),
-		    dimensions = {
-				width: animation.width,
-				height: animation.height
-			};
+	SpriteSheet.prototype.getFrameWidth = function () {
+		return this.getAnimation().width;
+	};
 
-		return dimensions;
+	SpriteSheet.prototype.getFrameHeight = function () {
+		return this.getAnimation().height;
 	};
 
 	SpriteSheet.prototype.next = function () {
