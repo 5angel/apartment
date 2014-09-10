@@ -46,5 +46,17 @@ var Room = (function () {
 		this.tiles = createTiles(this.depth, this.type);
 	}
 
+	Room.prototype.updateTiles = function (offset) {
+		if (!isInt(offset)) {
+			return new Error('offset should be an integer');
+		}
+	
+		this.tiles.forEach(function (tile, index, array) {
+			var value = -Math.floor(offset / (array.length - index)) * 2;
+
+			tile.style.backgroundPosition = value.toString() + 'px 0px';
+		});
+	};
+
 	return Room;
 })();

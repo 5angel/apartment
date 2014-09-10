@@ -5,60 +5,39 @@ var SpriteSheet = (function () {
 	var CLASS_BASE    = 'stage__sprite',
 	    CLASS_FLIPPED = CLASS_BASE + '_style_flipped';
 
-	var ANIMATION_OPTIONS_ALLOWED    = ['x', 'y', 'offsetX', 'offsetY', 'width', 'height', 'length', 'delays'],
-	    ANIMATION_OPTIONS_DIMENSIONS = ANIMATION_OPTIONS_ALLOWED.slice(0, 4);
-
-	function validateOptions(options) {
-		for (var key in options) {
-			if (!contains(ANIMATION_OPTIONS_ALLOWED, key)) {
-				throw new Error('Key "' + key + '" is not allowed!');
-			} else if (!isInt(options[key])) {
-				throw new Error('Key "' + key + '" should be an integer!');
-			}
+	function validateAnimation(name, animation) {
+		if  (!isValidString(name)) {
+			throw new Error('animation without name');
 		}
 
-		ANIMATION_OPTIONS_DIMENSIONS.forEach(function (key) {
-			options[key] = options[key] || 0;
-		});
-
-		if (isNaN(options.width) || options.width <= 0) {
-			throw new Error('Animation without a width!');
+		if (!(animation instanceof Animation)) {
+			throw new Error('invalid animation');
 		}
-
-		options.height = options.height || options.width;    
-		options.length = options.length || 1;
-		options.delays = options.delays || [];
-
-		while (options.delays.length < options.length) {
-			options.delays.push(0);
-		}
-
-		return options;
 	}
 
-	function SpriteSheet(name, animations) {
-		this.name      = name;
+	function SpriteSheet(name, presets) {
+		this.name = name;
+
+		if  (!isValidString(this.name)) {
+			throw new Error('sprite sheet without a name');
+		}
+
 		this.element   = new RichHTMLElement(document.createElement('div'));
 		this.index     = 0;
-		this.frame     = 0;
-		this.delay     = 0;
 		this.flipped   = false;
-		this.animation = animations ? animations.default : null;
+		this.animation = presets ? presets.initial : null;
 
 		this.element.target.style.backgroundImage = SRC_BASE + name + SRC_TAIL;
 		this.element.addClass(CLASS_BASE);
 
-		animations = animations || {};
+		presets = presets || {};
 
-		this.addAnimation = function (name, options) {
-			options = validateOptions(options);
+		this.addAnimation = function (name, animation) {
+			validateAnimation(name, animation);
 
-			animations[name] = options;
-			this.animation = name;
-
-			if (!animations.default) {
-				animations.default = name;
-			}
+			presets[name]   = animation;
+			presets.initial = presets.initial || name;
+			this.animation  = name;
 
 			this.redraw();
 
@@ -66,11 +45,11 @@ var SpriteSheet = (function () {
 		};
 
 		this.getAnimation = function (name) {
-			return animations[name || this.animation];
+			return presets[name || this.animation];
 		};
 
 		this.clone = function () {
-			return new SpriteSheet(name, animations)
+			return new SpriteSheet(this.name, presets)
 		};
 	}
 
@@ -82,39 +61,28 @@ var SpriteSheet = (function () {
 		return this.getAnimation().height;
 	};
 
-	SpriteSheet.prototype.next = function () {
-		this.delay++;
-
-		var current = this.getAnimation();
-
-		if (this.delay < current.delays[this.frame]) {
-			return this.delay + 1 >= current.delays[frame] && this.frame + 1 >= current.length;
-		} else { this.delay = 0 }
-
-		this.frame++;
-
-		if (this.frame >= current.length) {
-			this.frame = 0;
-		}
-
-		var posX = (current.x + (this.frame * current.width)) * 2,
-		    posY = current.y;
-
-		this.element.target.style.backgroundPosition = -posX.toString() + 'px ' + -posY.toString() + 'px';
-
-		return false;
+	SpriteSheet.prototype.step = function () {
+		return this.getAnimation().next();
 	};
 
 	SpriteSheet.prototype.update = function () {
+		var current = this.getAnimation();
+
+		var fx = (current.x + (current.frame * current.width)) * 2,
+		    fy = current.y;
+
 	    var style = this.element.target.style;	
 		
 		style.left = Math.floor(this.x * 2).toString() + 'px';
 		style.top  = Math.floor(this.y * 2).toString() + 'px';
+		style.backgroundPosition = -fx.toString() + 'px ' + -fy.toString() + 'px';
 	};
 
 	SpriteSheet.prototype.redraw = function () {
 	    var style   = this.element.target.style,
 		    current = this.getAnimation();
+
+		current.frame = 0;
 
 		var width  = current.width * 2,
 	        height = current.height * 2;

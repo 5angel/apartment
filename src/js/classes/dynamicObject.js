@@ -73,6 +73,8 @@ var DynamicObject = (function () {
     };
 
     DynamicObject.prototype.correctAnimation = function () {
+		var previous = this.sprite.animation;
+
 		if (Math.abs(this.velocity.value) <  1 && this.sprite.animation === 'walk') {
 			this.sprite.animation = 'idle';
 		}
@@ -81,7 +83,9 @@ var DynamicObject = (function () {
 			this.sprite.animation = 'walk';
 		}
 
-		this.sprite.redraw();
+		if (previous != this.sprite.animation) {
+			this.sprite.redraw();
+		}
     };
 
 	return DynamicObject;

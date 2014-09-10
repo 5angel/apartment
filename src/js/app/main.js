@@ -7,8 +7,8 @@
 	var SPRITES = {};
 
 	SPRITES.hero = new SpriteSheet('hero')
-		.addAnimation('idle', { width: 37, height: 72 })
-		.addAnimation('walk', { x: 37, width: 37, height: 72, length: 16 });
+		.addAnimation('idle', new Animation({ width: 37, height: 72 }))
+		.addAnimation('walk', new Animation({ x: 37, width: 37, height: 72, length: 16 }));
 
 	var pressed = [],
 		sprites = [];
@@ -65,7 +65,7 @@
 
 		loadedObjects.forEach(function (object, i) {
 			object.correctSprite(currentRoom.width, object === activeObject ? null : activeObject);
-			object.sprite.next();
+			object.sprite.step();
 			object.sprite.update();
 
 			var x = object.sprite.x,
@@ -84,7 +84,7 @@
 			}
 		});
 
-		var delta  = Math.floor(activeObject.getDeltaWidth(2));
+		var delta = Math.floor(activeObject.getDeltaWidth(2));
 
 		var x = 0;
 
@@ -94,11 +94,7 @@
 			x = Math.floor(activeObject.scroll) - delta;
 		}
 
-		currentRoom.tiles.forEach(function (t, i, array) {
-			var p = -Math.floor(x / (array.length - i)) * 2;
-
-			t.style.backgroundPosition = p.toString() + 'px 0px';
-		});
+		currentRoom.updateTiles(x);
 	}
 
 	function nextFrame() {

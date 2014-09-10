@@ -19,3 +19,15 @@ function inherits(Child, Parent) {
 	Child.prototype.constructor = Child;
 	Child.superclass = Parent.prototype;
 }
+
+function copy(source, target) {
+	target = target || {};
+
+	for (var prop in source) {
+		target[prop] = typeof source[prop] === 'object'
+			? copy(target[prop], source[prop])
+			: target[prop] = source[prop];
+	}
+
+	return target;
+}

@@ -19,6 +19,18 @@ function inherits(Child, Parent) {
 	Child.prototype.constructor = Child;
 	Child.superclass = Parent.prototype;
 }
+
+function copy(source, target) {
+	target = target || {};
+
+	for (var prop in source) {
+		target[prop] = typeof source[prop] === 'object'
+			? copy(target[prop], source[prop])
+			: target[prop] = source[prop];
+	}
+
+	return target;
+}
 var RichHTMLElement = (function () {
   function RichHTMLElement(element) {
     this.target = element;
@@ -57,9 +69,76 @@ var RichHTMLElement = (function () {
 })();
 
 var Animation = (function () {
-	function Animation() {
-		
+	var SIZE_DEFAULT = 16;
+
+	var OPTIONS_DEFAULT = {
+		x: 0,
+		y: 0,
+		offsetX: 0,
+		offsetY: 0,
+		width: SIZE_DEFAULT,
+		height: SIZE_DEFAULT,
+		length: 1,
+		delays: []
+	};
+
+	var OPTIONS_ALLOWED     = ['x', 'y', 'offsetX', 'offsetY', 'width', 'height', 'length', 'delays']
+		OPTIONS_COORDINATES = OPTIONS_ALLOWED.slice(0, -4),
+		OPTIONS_DIMENSIONS  = OPTIONS_ALLOWED.slice(4, -1);
+
+	function validateOptions(options) {
+		if (!OPTIONS_COORDINATES.every(function (key) {
+			return isInt(options[key]);
+		})) {
+			throw new Error('key "' + key + '" should be an integer');
+		}
+
+		if (!OPTIONS_DIMENSIONS.every(function (key) {
+		    var value = options[key];
+			return isInt(value) && value !== 0;
+		})) {
+			throw new Error('key "' + key + '" should be an integer and higher than zero');
+		}
+
+		if (!isArray(options.delays) || !options.delays.every(isInt)) {
+			throw new Error('delays should be an array of integers');
+		}
 	}
+	
+	function Animation(options) {
+		options = copy(options, copy(OPTIONS_DEFAULT));
+
+		validateOptions(options);
+
+		var that = this;
+
+		OPTIONS_ALLOWED.forEach(function (key) {
+			that[key] = options[key];
+		});
+
+		while (this.length < this.delays.length) {
+			this.delays.push(0);
+		}
+
+		this.frame = 0;
+		this.delay = 0;
+	}
+
+	Animation.prototype.next = function () {
+		if (this.delay < this.delays[this.frame]) {
+			return this.delay + 1 >= this.delays[this.frame] && this.frame + 1 >= this.length;
+		} else {
+			this.delay = 0;
+		}
+
+		this.frame++;
+
+		if (this.frame >= this.length) {
+			this.frame = 0;
+		}
+
+		return false;
+	};
 
 	return Animation;
 })();
@@ -70,60 +149,39 @@ var SpriteSheet = (function () {
 	var CLASS_BASE    = 'stage__sprite',
 	    CLASS_FLIPPED = CLASS_BASE + '_style_flipped';
 
-	var ANIMATION_OPTIONS_ALLOWED    = ['x', 'y', 'offsetX', 'offsetY', 'width', 'height', 'length', 'delays'],
-	    ANIMATION_OPTIONS_DIMENSIONS = ANIMATION_OPTIONS_ALLOWED.slice(0, 4);
-
-	function validateOptions(options) {
-		for (var key in options) {
-			if (!contains(ANIMATION_OPTIONS_ALLOWED, key)) {
-				throw new Error('Key "' + key + '" is not allowed!');
-			} else if (!isInt(options[key])) {
-				throw new Error('Key "' + key + '" should be an integer!');
-			}
+	function validateAnimation(name, animation) {
+		if  (!isValidString(name)) {
+			throw new Error('animation without name');
 		}
 
-		ANIMATION_OPTIONS_DIMENSIONS.forEach(function (key) {
-			options[key] = options[key] || 0;
-		});
-
-		if (isNaN(options.width) || options.width <= 0) {
-			throw new Error('Animation without a width!');
+		if (!(animation instanceof Animation)) {
+			throw new Error('invalid animation');
 		}
-
-		options.height = options.height || options.width;    
-		options.length = options.length || 1;
-		options.delays = options.delays || [];
-
-		while (options.delays.length < options.length) {
-			options.delays.push(0);
-		}
-
-		return options;
 	}
 
-	function SpriteSheet(name, animations) {
-		this.name      = name;
+	function SpriteSheet(name, presets) {
+		this.name = name;
+
+		if  (!isValidString(this.name)) {
+			throw new Error('sprite sheet without a name');
+		}
+
 		this.element   = new RichHTMLElement(document.createElement('div'));
 		this.index     = 0;
-		this.frame     = 0;
-		this.delay     = 0;
 		this.flipped   = false;
-		this.animation = animations ? animations.default : null;
+		this.animation = presets ? presets.initial : null;
 
 		this.element.target.style.backgroundImage = SRC_BASE + name + SRC_TAIL;
 		this.element.addClass(CLASS_BASE);
 
-		animations = animations || {};
+		presets = presets || {};
 
-		this.addAnimation = function (name, options) {
-			options = validateOptions(options);
+		this.addAnimation = function (name, animation) {
+			validateAnimation(name, animation);
 
-			animations[name] = options;
-			this.animation = name;
-
-			if (!animations.default) {
-				animations.default = name;
-			}
+			presets[name]   = animation;
+			presets.initial = presets.initial || name;
+			this.animation  = name;
 
 			this.redraw();
 
@@ -131,11 +189,11 @@ var SpriteSheet = (function () {
 		};
 
 		this.getAnimation = function (name) {
-			return animations[name || this.animation];
+			return presets[name || this.animation];
 		};
 
 		this.clone = function () {
-			return new SpriteSheet(name, animations)
+			return new SpriteSheet(this.name, presets)
 		};
 	}
 
@@ -147,39 +205,28 @@ var SpriteSheet = (function () {
 		return this.getAnimation().height;
 	};
 
-	SpriteSheet.prototype.next = function () {
-		this.delay++;
-
-		var current = this.getAnimation();
-
-		if (this.delay < current.delays[this.frame]) {
-			return this.delay + 1 >= current.delays[frame] && this.frame + 1 >= current.length;
-		} else { this.delay = 0 }
-
-		this.frame++;
-
-		if (this.frame >= current.length) {
-			this.frame = 0;
-		}
-
-		var posX = (current.x + (this.frame * current.width)) * 2,
-		    posY = current.y;
-
-		this.element.target.style.backgroundPosition = -posX.toString() + 'px ' + -posY.toString() + 'px';
-
-		return false;
+	SpriteSheet.prototype.step = function () {
+		return this.getAnimation().next();
 	};
 
 	SpriteSheet.prototype.update = function () {
+		var current = this.getAnimation();
+
+		var fx = (current.x + (current.frame * current.width)) * 2,
+		    fy = current.y;
+
 	    var style = this.element.target.style;	
 		
 		style.left = Math.floor(this.x * 2).toString() + 'px';
 		style.top  = Math.floor(this.y * 2).toString() + 'px';
+		style.backgroundPosition = -fx.toString() + 'px ' + -fy.toString() + 'px';
 	};
 
 	SpriteSheet.prototype.redraw = function () {
 	    var style   = this.element.target.style,
 		    current = this.getAnimation();
+
+		current.frame = 0;
 
 		var width  = current.width * 2,
 	        height = current.height * 2;
@@ -358,6 +405,8 @@ var DynamicObject = (function () {
     };
 
     DynamicObject.prototype.correctAnimation = function () {
+		var previous = this.sprite.animation;
+
 		if (Math.abs(this.velocity.value) <  1 && this.sprite.animation === 'walk') {
 			this.sprite.animation = 'idle';
 		}
@@ -366,7 +415,9 @@ var DynamicObject = (function () {
 			this.sprite.animation = 'walk';
 		}
 
-		this.sprite.redraw();
+		if (previous != this.sprite.animation) {
+			this.sprite.redraw();
+		}
     };
 
 	return DynamicObject;
@@ -428,6 +479,18 @@ var Room = (function () {
 		this.tiles = createTiles(this.depth, this.type);
 	}
 
+	Room.prototype.updateTiles = function (offset) {
+		if (!isInt(offset)) {
+			return new Error('offset should be an integer');
+		}
+	
+		this.tiles.forEach(function (tile, index, array) {
+			var value = -Math.floor(offset / (array.length - index)) * 2;
+
+			tile.style.backgroundPosition = value.toString() + 'px 0px';
+		});
+	};
+
 	return Room;
 })();
 (function () {
@@ -439,8 +502,8 @@ var Room = (function () {
 	var SPRITES = {};
 
 	SPRITES.hero = new SpriteSheet('hero')
-		.addAnimation('idle', { width: 37, height: 72 })
-		.addAnimation('walk', { x: 37, width: 37, height: 72, length: 16 });
+		.addAnimation('idle', new Animation({ width: 37, height: 72 }))
+		.addAnimation('walk', new Animation({ x: 37, width: 37, height: 72, length: 16 }));
 
 	var pressed = [],
 		sprites = [];
@@ -497,7 +560,7 @@ var Room = (function () {
 
 		loadedObjects.forEach(function (object, i) {
 			object.correctSprite(currentRoom.width, object === activeObject ? null : activeObject);
-			object.sprite.next();
+			object.sprite.step();
 			object.sprite.update();
 
 			var x = object.sprite.x,
@@ -516,7 +579,7 @@ var Room = (function () {
 			}
 		});
 
-		var delta  = Math.floor(activeObject.getDeltaWidth(2));
+		var delta = Math.floor(activeObject.getDeltaWidth(2));
 
 		var x = 0;
 
@@ -526,11 +589,7 @@ var Room = (function () {
 			x = Math.floor(activeObject.scroll) - delta;
 		}
 
-		currentRoom.tiles.forEach(function (t, i, array) {
-			var p = -Math.floor(x / (array.length - i)) * 2;
-
-			t.style.backgroundPosition = p.toString() + 'px 0px';
-		});
+		currentRoom.updateTiles(x);
 	}
 
 	function nextFrame() {
