@@ -20,27 +20,31 @@ var Room = (function () {
 		return tiles;
 	}
 
-	function Room(name, type, width, depth) {
+	function validateRoom(name, type, width, depth) {
 		if (!isValidString(name)) {
 			throw new Error('Room without a name!');
 		}
 
+		if (!isValidString(type)) {
+			throw new Error('Room with invalid type');
+		}
+
+		if (!isInt(width)) {
+			throw new Error('Room with invalid width');
+		}
+
+		if (!isInt(depth)) {
+			throw new Error('Room with invalid depth');
+		}
+	}
+
+	function Room(name, type, width, depth) {
 		this.name  = name;
 		this.type  = type  || TYPE_DEFAULT;
 		this.width = width || WIDTH_DEFAULT;
 		this.depth = depth || 1;
 
-		if (!isValidString(this.type)) {
-			throw new Error('Room with invalid type of "' + this.type + '"!');
-		}
-
-		if (!isInt(this.width)) {
-			throw new Error('Room with invalid width of "' + this.width + '"!');
-		}
-
-		if (!isInt(this.depth)) {
-			throw new Error('Room with invalid depth of "' + this.depth + '"!');
-		}
+		validateRoom(this.name, this.type, this.width, this.depth);
 
 		this.width = Math.max(WIDTH_DEFAULT, this.width);
 		this.tiles = createTiles(this.depth, this.type);

@@ -3,12 +3,6 @@ var GameObject = (function () {
 		STAGE_HEIGHT = 112,
 		FLOOR_OFFSET = 6;
 
-	function checkSprite(sprite) {
-		if (!(sprite instanceof SpriteSheet)) {
-			throw new Error('invalid sprite');
-		}
-	}
-
 	function checkScroll(scroll) {
 		if (!isNumber(scroll)) {
 			throw new Error('scroll value should be a number');
@@ -17,12 +11,44 @@ var GameObject = (function () {
 		}
 	}
 
+	function validateActionListener(name, callback) {
+		if (!isValidString(name)) {
+			throw new Error('action receiver should have a valid name');
+		}
+
+		if (!isFunction(callback)) {
+			throw new Error('action callback should be a function');
+		}
+	}
+
 	function GameObject(sprite, scroll) {
 		this.sprite = sprite;
 		this.scroll = scroll || 0;
 
-		checkSprite(this.sprite);
+		check.sprite(this.sprite);
 		checkScroll(this.scroll);
+
+		var listeneres = {};
+
+		this.addActionListener = function (name, callback) {
+			validateActionListener(name, callback);
+
+			if (listeneres[name] !== undefined) {
+				console.warn('a receiver with name "' + name + '" already exists, overwriting');
+			}
+
+			listeneres[name] = callback;
+		};
+
+		this.receiveAction = function (action) {
+			check.action(action);
+
+			var callback = listeneres[action.name];
+
+			callback
+				? callback(action)
+				: console.error('Couldn\'t find an action listener for "' + action.name + '"');
+		};
 
 		this.getDeltaWidth = function (k) {
 			k = k || 1;

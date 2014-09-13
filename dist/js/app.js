@@ -6,6 +6,10 @@ function isInt(n) { return typeof n === 'number' && n % 1 == 0 }
 
 function isValidString(str) { return typeof str === 'string' && str !== '' }
 
+function isFunction(func) {
+	return func && new Object().toString.call(func) === '[object Function]';
+}
+
 function contains(array) {
   if (arguments.length < 2) { throw new Error('Nothing to search for!') }
   var args = Array.prototype.slice.call(arguments).slice(1);
@@ -149,22 +153,33 @@ var SpriteSheet = (function () {
 	var CLASS_BASE    = 'stage__sprite',
 	    CLASS_FLIPPED = CLASS_BASE + '_style_flipped';
 
+	function validateOffsets(x, y) {
+		if  (!isInt(x) || !isInt(y)) {
+			throw new Error('Offset values should be integers');
+		}
+	}
+
 	function validateAnimation(name, animation) {
 		if  (!isValidString(name)) {
 			throw new Error('animation without name');
 		}
 
-		if (!(animation instanceof Animation)) {
-			throw new Error('invalid animation');
-		}
+		check.animation(animation);
 	}
+	
 
-	function SpriteSheet(name, presets) {
+	function SpriteSheet(name, offsetX, offsetY, presets) {
 		this.name = name;
 
 		if  (!isValidString(this.name)) {
 			throw new Error('sprite sheet without a name');
 		}
+
+		this.offsetX = offsetX || 0;
+		this.offsetY = offsetY || 0;
+
+		this.x = 0;
+		this.y = 0;
 
 		this.element   = new RichHTMLElement(document.createElement('div'));
 		this.index     = 0;
@@ -193,7 +208,7 @@ var SpriteSheet = (function () {
 		};
 
 		this.clone = function () {
-			return new SpriteSheet(this.name, presets)
+			return new SpriteSheet(this.name, this.offsetX, this.offsetY, presets);
 		};
 	}
 
@@ -217,8 +232,8 @@ var SpriteSheet = (function () {
 
 	    var style = this.element.target.style;	
 		
-		style.left = Math.floor(this.x * 2).toString() + 'px';
-		style.top  = Math.floor(this.y * 2).toString() + 'px';
+		style.left = Math.floor((this.x * 2) + (this.offsetX * 2)).toString() + 'px';
+		style.top  = Math.floor((this.y * 2) + (this.offsetY * 2)).toString() + 'px';
 		style.backgroundPosition = -fx.toString() + 'px ' + -fy.toString() + 'px';
 	};
 
@@ -254,16 +269,18 @@ var SpriteSheet = (function () {
 
 	return SpriteSheet;
 })();
+var Action = (function () {
+
+	function Action() {
+
+	}
+
+	return Action;
+})();
 var GameObject = (function () {
 	var STAGE_WIDTH  = 320,
 		STAGE_HEIGHT = 112,
 		FLOOR_OFFSET = 6;
-
-	function checkSprite(sprite) {
-		if (!(sprite instanceof SpriteSheet)) {
-			throw new Error('invalid sprite');
-		}
-	}
 
 	function checkScroll(scroll) {
 		if (!isNumber(scroll)) {
@@ -273,12 +290,44 @@ var GameObject = (function () {
 		}
 	}
 
+	function validateActionListener(name, callback) {
+		if (!isValidString(name)) {
+			throw new Error('action receiver should have a valid name');
+		}
+
+		if (!isFunction(callback)) {
+			throw new Error('action callback should be a function');
+		}
+	}
+
 	function GameObject(sprite, scroll) {
 		this.sprite = sprite;
 		this.scroll = scroll || 0;
 
-		checkSprite(this.sprite);
+		check.sprite(this.sprite);
 		checkScroll(this.scroll);
+
+		var listeneres = {};
+
+		this.addActionListener = function (name, callback) {
+			validateActionListener(name, callback);
+
+			if (listeneres[name] !== undefined) {
+				console.warn('a receiver with name "' + name + '" already exists, overwriting');
+			}
+
+			listeneres[name] = callback;
+		};
+
+		this.receiveAction = function (action) {
+			check.action(action);
+
+			var callback = listeneres[action.name];
+
+			callback
+				? callback(action)
+				: console.error('Couldn\'t find an action listener for "' + action.name + '"');
+		};
 
 		this.getDeltaWidth = function (k) {
 			k = k || 1;
@@ -423,8 +472,14 @@ var DynamicObject = (function () {
 	return DynamicObject;
 })();
 var Entyty = (function () {
-	function Entity() {
+	function Entity(sprite, scroll, vStep, vMax, hitWidth, actions) {
 		Entity.uber.constructor.apply(this, arguments);
+
+		this.hitWidth = hitWidth;
+
+		if (!isInt(this.hitWidth)) {
+			new Error('hit width should be an integer');
+		}
 	}
 
 	inherits(Entity, DynamicObject);
@@ -453,27 +508,31 @@ var Room = (function () {
 		return tiles;
 	}
 
-	function Room(name, type, width, depth) {
+	function validateRoom(name, type, width, depth) {
 		if (!isValidString(name)) {
 			throw new Error('Room without a name!');
 		}
 
+		if (!isValidString(type)) {
+			throw new Error('Room with invalid type');
+		}
+
+		if (!isInt(width)) {
+			throw new Error('Room with invalid width');
+		}
+
+		if (!isInt(depth)) {
+			throw new Error('Room with invalid depth');
+		}
+	}
+
+	function Room(name, type, width, depth) {
 		this.name  = name;
 		this.type  = type  || TYPE_DEFAULT;
 		this.width = width || WIDTH_DEFAULT;
 		this.depth = depth || 1;
 
-		if (!isValidString(this.type)) {
-			throw new Error('Room with invalid type of "' + this.type + '"!');
-		}
-
-		if (!isInt(this.width)) {
-			throw new Error('Room with invalid width of "' + this.width + '"!');
-		}
-
-		if (!isInt(this.depth)) {
-			throw new Error('Room with invalid depth of "' + this.depth + '"!');
-		}
+		validateRoom(this.name, this.type, this.width, this.depth);
 
 		this.width = Math.max(WIDTH_DEFAULT, this.width);
 		this.tiles = createTiles(this.depth, this.type);
@@ -493,6 +552,30 @@ var Room = (function () {
 
 	return Room;
 })();
+var check = (function () {
+	function invalidWhenNot(name, type) {
+		return function (object) {
+			if (!(object instanceof type)) {
+				throw new Error('invalid', name);
+			}
+		}
+	}
+
+	return {
+		room: invalidWhenNot('room', Room),
+		object: invalidWhenNot('object', GameObject),
+		listOfObjects: function (list) {
+			if (!isArray(list) || (isArray(list) && (list.length === 0 && !list.every(function (object) {
+				return object instanceof GameObject;
+			})))) {
+				throw new Error('invalid list of objects!');
+			}
+		},
+		animation: invalidWhenNot('animation', Animation),
+		sprite: invalidWhenNot('sprite', SpriteSheet),
+		action: invalidWhenNot('action', Action)
+	};
+})();
 (function () {
 	var STAGE_WIDTH   = 320,
 		STAGE_HEIGHT  = 112,
@@ -504,6 +587,9 @@ var Room = (function () {
 	SPRITES.hero = new SpriteSheet('hero')
 		.addAnimation('idle', new Animation({ width: 37, height: 72 }))
 		.addAnimation('walk', new Animation({ x: 37, width: 37, height: 72, length: 16 }));
+
+	SPRITES.door = new SpriteSheet('door', 0, -10)
+		.addAnimation('idle', new Animation({ width: 40, height: 80 }));
 
 	var pressed = [],
 		sprites = [];
@@ -602,6 +688,9 @@ var Room = (function () {
 			case 'left':
 				activeObject.push();
 				break;
+			case 'down':
+				performActionWith(activeObject);
+				break;
 			default:
 				activeObject.wait();
 				break;
@@ -610,16 +699,13 @@ var Room = (function () {
 		updateView();
 	}
 
+	function performActionWith(object) {
+		check.object(object);
+	}
+
 	function loadLevel(room, objects) {
-		if (room instanceof Room === false ) {
-			throw new Error('Please provide a room!');
-		}
-
-		var o = objects;
-
-		if (!isArray(o) || (isArray(o) && (o.length === 0 && !o.every(function (t) { return t instanceof GameObject })))) {
-			throw new Error('Please provide a correct array of objects!');
-		}
+		check.room(room);
+		check.listOfObjects(objects);
 
 		currentRoom   = room;
 		loadedObjects = objects;
@@ -641,9 +727,9 @@ var Room = (function () {
 
 	loadLevel(new Room('blank', null, 840), [
 		new DynamicObject(SPRITES.hero, 740),
-		new DynamicObject(SPRITES.hero.clone(), 40),
-		new DynamicObject(SPRITES.hero.clone(), 400),
-		new DynamicObject(SPRITES.hero.clone(), 780)
+		new DynamicObject(SPRITES.door.clone(), 40),
+		new DynamicObject(SPRITES.door.clone(), 400),
+		new DynamicObject(SPRITES.door.clone(), 780)
 	]);
 
 	setInterval(nextFrame, FRAME_STEP);

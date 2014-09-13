@@ -5,22 +5,33 @@ var SpriteSheet = (function () {
 	var CLASS_BASE    = 'stage__sprite',
 	    CLASS_FLIPPED = CLASS_BASE + '_style_flipped';
 
+	function validateOffsets(x, y) {
+		if  (!isInt(x) || !isInt(y)) {
+			throw new Error('Offset values should be integers');
+		}
+	}
+
 	function validateAnimation(name, animation) {
 		if  (!isValidString(name)) {
 			throw new Error('animation without name');
 		}
 
-		if (!(animation instanceof Animation)) {
-			throw new Error('invalid animation');
-		}
+		check.animation(animation);
 	}
+	
 
-	function SpriteSheet(name, presets) {
+	function SpriteSheet(name, offsetX, offsetY, presets) {
 		this.name = name;
 
 		if  (!isValidString(this.name)) {
 			throw new Error('sprite sheet without a name');
 		}
+
+		this.offsetX = offsetX || 0;
+		this.offsetY = offsetY || 0;
+
+		this.x = 0;
+		this.y = 0;
 
 		this.element   = new RichHTMLElement(document.createElement('div'));
 		this.index     = 0;
@@ -49,7 +60,7 @@ var SpriteSheet = (function () {
 		};
 
 		this.clone = function () {
-			return new SpriteSheet(this.name, presets)
+			return new SpriteSheet(this.name, this.offsetX, this.offsetY, presets);
 		};
 	}
 
@@ -73,8 +84,8 @@ var SpriteSheet = (function () {
 
 	    var style = this.element.target.style;	
 		
-		style.left = Math.floor(this.x * 2).toString() + 'px';
-		style.top  = Math.floor(this.y * 2).toString() + 'px';
+		style.left = Math.floor((this.x * 2) + (this.offsetX * 2)).toString() + 'px';
+		style.top  = Math.floor((this.y * 2) + (this.offsetY * 2)).toString() + 'px';
 		style.backgroundPosition = -fx.toString() + 'px ' + -fy.toString() + 'px';
 	};
 

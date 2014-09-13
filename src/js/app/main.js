@@ -10,6 +10,9 @@
 		.addAnimation('idle', new Animation({ width: 37, height: 72 }))
 		.addAnimation('walk', new Animation({ x: 37, width: 37, height: 72, length: 16 }));
 
+	SPRITES.door = new SpriteSheet('door', 0, -10)
+		.addAnimation('idle', new Animation({ width: 40, height: 80 }));
+
 	var pressed = [],
 		sprites = [];
 
@@ -107,6 +110,9 @@
 			case 'left':
 				activeObject.push();
 				break;
+			case 'down':
+				performActionWith(activeObject);
+				break;
 			default:
 				activeObject.wait();
 				break;
@@ -115,16 +121,13 @@
 		updateView();
 	}
 
+	function performActionWith(object) {
+		check.object(object);
+	}
+
 	function loadLevel(room, objects) {
-		if (room instanceof Room === false ) {
-			throw new Error('Please provide a room!');
-		}
-
-		var o = objects;
-
-		if (!isArray(o) || (isArray(o) && (o.length === 0 && !o.every(function (t) { return t instanceof GameObject })))) {
-			throw new Error('Please provide a correct array of objects!');
-		}
+		check.room(room);
+		check.listOfObjects(objects);
 
 		currentRoom   = room;
 		loadedObjects = objects;
@@ -146,9 +149,9 @@
 
 	loadLevel(new Room('blank', null, 840), [
 		new DynamicObject(SPRITES.hero, 740),
-		new DynamicObject(SPRITES.hero.clone(), 40),
-		new DynamicObject(SPRITES.hero.clone(), 400),
-		new DynamicObject(SPRITES.hero.clone(), 780)
+		new DynamicObject(SPRITES.door.clone(), 40),
+		new DynamicObject(SPRITES.door.clone(), 400),
+		new DynamicObject(SPRITES.door.clone(), 780)
 	]);
 
 	setInterval(nextFrame, FRAME_STEP);
