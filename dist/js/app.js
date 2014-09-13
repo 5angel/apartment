@@ -271,8 +271,12 @@ var SpriteSheet = (function () {
 })();
 var Action = (function () {
 
-	function Action() {
+	function Action(name, target, data) {
+		check.object(target);
 
+		this.name   = name;
+		this.target = target;
+		this.data   = data;
 	}
 
 	return Action;
@@ -282,11 +286,19 @@ var GameObject = (function () {
 		STAGE_HEIGHT = 112,
 		FLOOR_OFFSET = 6;
 
-	function checkScroll(scroll) {
-		if (!isNumber(scroll)) {
+	function validateScroll(value) {
+		if (!isNumber(value)) {
 			throw new Error('scroll value should be a number');
-		} else if (scroll < 0) {
+		} else if (value < 0) {
 			throw new Error('scroll value cannot be lower than 0');
+		}
+	}
+
+	function validateHitWidth(value) {
+		if (!isInt(value)) {
+			throw new Error('hit width should be an integer');
+		} else if (value < 0) {
+			throw new Error('hit width cannot be lower than 0');
 		}
 	}
 
@@ -300,14 +312,25 @@ var GameObject = (function () {
 		}
 	}
 
-	function GameObject(sprite, scroll) {
-		this.sprite = sprite;
-		this.scroll = scroll || 0;
+	function GameObject(sprite, scroll, hitWidth) {
+		this.sprite   = sprite;
+		this.scroll   = scroll || 0;
 
 		check.sprite(this.sprite);
-		checkScroll(this.scroll);
+
+		validateScroll(this.scroll);
+
+		hitWidth = hitWidth || 0;
+
+		validateHitWidth(hitWidth);
 
 		var listeneres = {};
+
+		this.getHitWidth = function () {
+			return !hitWidth
+				? Math.floor(this.sprite.getFrameWidth() / 2)
+				: hitWidth;
+		};
 
 		this.addActionListener = function (name, callback) {
 			validateActionListener(name, callback);
@@ -377,6 +400,14 @@ var GameObject = (function () {
 		this.sprite.update();
 	};
 
+	GameObject.prototype.createAction = function (name) {
+		if (!isValidString(name)) {
+			throw new Error('action should have a name');
+		}
+
+		return new Action(name, this);
+	};
+
 	return GameObject;
 })();
 var DynamicObject = (function () {
@@ -394,7 +425,7 @@ var DynamicObject = (function () {
 		}
 	}
 
-	function DynamicObject(sprite, scroll, vStep, vMax) {
+	function DynamicObject(sprite, scroll, hitWidth, vStep, vMax) {
 		DynamicObject.superclass.constructor.apply(this, arguments);
 
 		this.velocity = {
@@ -470,21 +501,6 @@ var DynamicObject = (function () {
     };
 
 	return DynamicObject;
-})();
-var Entyty = (function () {
-	function Entity(sprite, scroll, vStep, vMax, hitWidth, actions) {
-		Entity.uber.constructor.apply(this, arguments);
-
-		this.hitWidth = hitWidth;
-
-		if (!isInt(this.hitWidth)) {
-			new Error('hit width should be an integer');
-		}
-	}
-
-	inherits(Entity, DynamicObject);
-
-	return Entity;
 })();
 var Room = (function () {
 	var WIDTH_DEFAULT = 320;
@@ -604,7 +620,7 @@ var check = (function () {
 		} else if (value === 65 || value === 37) {
 			return 'left';
 		}
-  }
+	}
 
 	function onKeyDown(e) {
 		var pending = getKeyAction(e.keyCode);
@@ -678,8 +694,10 @@ var check = (function () {
 		currentRoom.updateTiles(x);
 	}
 
+	var hold = false;
+
 	function nextFrame() {
-		var action = pressed[0];
+		var action = pressed[pressed.length - 1];
 
 		switch (action) {
 			case 'right':
@@ -689,18 +707,39 @@ var check = (function () {
 				activeObject.push();
 				break;
 			case 'down':
-				performActionWith(activeObject);
+				if (!hold) {
+					performActionWith(activeObject);
+				}
+
+				activeObject.wait();
 				break;
 			default:
 				activeObject.wait();
 				break;
 		}
 
+		hold = contains(pressed, 'down');
+
 		updateView();
 	}
 
+	function locateObjectAt(relative) {
+		var nearby = loadedObjects.filter(function (object) {
+			var left  = relative.scroll >= object.scroll - object.getHitWidth(),
+			    right = relative.scroll + relative.getHitWidth() <= object.scroll + object.getHitWidth()
+
+			return left && right && object !== relative;
+		});
+
+		return nearby[0];
+	}
+
 	function performActionWith(object) {
-		check.object(object);
+		var target = locateObjectAt(object);
+
+		if (target) {
+			target.receiveAction(object.createAction('interact'));
+		}
 	}
 
 	function loadLevel(room, objects) {
@@ -726,10 +765,10 @@ var check = (function () {
 	}
 
 	loadLevel(new Room('blank', null, 840), [
-		new DynamicObject(SPRITES.hero, 740),
-		new DynamicObject(SPRITES.door.clone(), 40),
-		new DynamicObject(SPRITES.door.clone(), 400),
-		new DynamicObject(SPRITES.door.clone(), 780)
+		new DynamicObject(SPRITES.hero, 740, 8),
+		new GameObject(SPRITES.door.clone(), 40),
+		new GameObject(SPRITES.door.clone(), 400),
+		new GameObject(SPRITES.door.clone(), 780)
 	]);
 
 	setInterval(nextFrame, FRAME_STEP);

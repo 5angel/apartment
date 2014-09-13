@@ -3,11 +3,19 @@ var GameObject = (function () {
 		STAGE_HEIGHT = 112,
 		FLOOR_OFFSET = 6;
 
-	function checkScroll(scroll) {
-		if (!isNumber(scroll)) {
+	function validateScroll(value) {
+		if (!isNumber(value)) {
 			throw new Error('scroll value should be a number');
-		} else if (scroll < 0) {
+		} else if (value < 0) {
 			throw new Error('scroll value cannot be lower than 0');
+		}
+	}
+
+	function validateHitWidth(value) {
+		if (!isInt(value)) {
+			throw new Error('hit width should be an integer');
+		} else if (value < 0) {
+			throw new Error('hit width cannot be lower than 0');
 		}
 	}
 
@@ -21,14 +29,25 @@ var GameObject = (function () {
 		}
 	}
 
-	function GameObject(sprite, scroll) {
-		this.sprite = sprite;
-		this.scroll = scroll || 0;
+	function GameObject(sprite, scroll, hitWidth) {
+		this.sprite   = sprite;
+		this.scroll   = scroll || 0;
 
 		check.sprite(this.sprite);
-		checkScroll(this.scroll);
+
+		validateScroll(this.scroll);
+
+		hitWidth = hitWidth || 0;
+
+		validateHitWidth(hitWidth);
 
 		var listeneres = {};
+
+		this.getHitWidth = function () {
+			return !hitWidth
+				? Math.floor(this.sprite.getFrameWidth() / 2)
+				: hitWidth;
+		};
 
 		this.addActionListener = function (name, callback) {
 			validateActionListener(name, callback);
@@ -96,6 +115,14 @@ var GameObject = (function () {
 		}
 
 		this.sprite.update();
+	};
+
+	GameObject.prototype.createAction = function (name) {
+		if (!isValidString(name)) {
+			throw new Error('action should have a name');
+		}
+
+		return new Action(name, this);
 	};
 
 	return GameObject;

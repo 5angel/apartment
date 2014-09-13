@@ -13,7 +13,7 @@ var DynamicObject = (function () {
 		}
 	}
 
-	function DynamicObject(sprite, scroll, vStep, vMax) {
+	function DynamicObject(sprite, scroll, hitWidth, vStep, vMax) {
 		DynamicObject.superclass.constructor.apply(this, arguments);
 
 		this.velocity = {

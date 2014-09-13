@@ -26,7 +26,7 @@
 		} else if (value === 65 || value === 37) {
 			return 'left';
 		}
-  }
+	}
 
 	function onKeyDown(e) {
 		var pending = getKeyAction(e.keyCode);
@@ -100,8 +100,10 @@
 		currentRoom.updateTiles(x);
 	}
 
+	var hold = false;
+
 	function nextFrame() {
-		var action = pressed[0];
+		var action = pressed[pressed.length - 1];
 
 		switch (action) {
 			case 'right':
@@ -111,18 +113,39 @@
 				activeObject.push();
 				break;
 			case 'down':
-				performActionWith(activeObject);
+				if (!hold) {
+					performActionWith(activeObject);
+				}
+
+				activeObject.wait();
 				break;
 			default:
 				activeObject.wait();
 				break;
 		}
 
+		hold = contains(pressed, 'down');
+
 		updateView();
 	}
 
+	function locateObjectAt(relative) {
+		var nearby = loadedObjects.filter(function (object) {
+			var left  = relative.scroll >= object.scroll - object.getHitWidth(),
+			    right = relative.scroll + relative.getHitWidth() <= object.scroll + object.getHitWidth()
+
+			return left && right && object !== relative;
+		});
+
+		return nearby[0];
+	}
+
 	function performActionWith(object) {
-		check.object(object);
+		var target = locateObjectAt(object);
+
+		if (target) {
+			target.receiveAction(object.createAction('interact'));
+		}
 	}
 
 	function loadLevel(room, objects) {
@@ -147,11 +170,13 @@
 		stage.appendChild(activeObject.sprite.element.target);
 	}
 
+	var actionDoor = 
+	
 	loadLevel(new Room('blank', null, 840), [
-		new DynamicObject(SPRITES.hero, 740),
-		new DynamicObject(SPRITES.door.clone(), 40),
-		new DynamicObject(SPRITES.door.clone(), 400),
-		new DynamicObject(SPRITES.door.clone(), 780)
+		new DynamicObject(SPRITES.hero.clone(), 740, 8),
+		new GameObject(SPRITES.door.clone(), 40),
+		new GameObject(SPRITES.door.clone(), 400),
+		new GameObject(SPRITES.door.clone(), 780)
 	]);
 
 	setInterval(nextFrame, FRAME_STEP);

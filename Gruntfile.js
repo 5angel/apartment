@@ -25,7 +25,6 @@ module.exports = function(grunt) {
 		  'src/js/classes/action.js',
 		  'src/js/classes/gameObject.js',
 		  'src/js/classes/dynamicObject.js',
-		  'src/js/classes/entity.js',
 		  'src/js/classes/room.js',
 		  'src/js/app/check.js',
 		  'src/js/app/main.js',
