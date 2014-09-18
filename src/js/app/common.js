@@ -1,19 +1,33 @@
-function isArray(obj) { return Object.prototype.toString.call(obj) === '[object Array]' }
+function isArray(obj) {
+	return Object.prototype.toString.call(obj) === '[object Array]';
+}
 
-function isNumber(n) { return !isNaN(parseFloat(n)) && isFinite(n) }
+function isNumber(n) {
+	return !isNaN(parseFloat(n)) && isFinite(n);
+}
 
-function isInt(n) { return typeof n === 'number' && n % 1 == 0 }
+function isInt(n) {
+	return typeof n === 'number' && n % 1 == 0;
+}
 
-function isValidString(str) { return typeof str === 'string' && str !== '' }
+function isValidString(str) {
+	return typeof str === 'string' && str !== '';
+}
 
 function isFunction(func) {
 	return func && new Object().toString.call(func) === '[object Function]';
 }
 
 function contains(array) {
-  if (arguments.length < 2) { throw new Error('Nothing to search for!') }
-  var args = Array.prototype.slice.call(arguments).slice(1);
-  return args.every(function (item) { return array.indexOf(item) !== -1 });
+  if (arguments.length < 2) {
+	throw new Error('nothing to search for');
+  }
+ 
+  var items = Array.prototype.slice.call(arguments).slice(1);
+ 
+  return items.every(function (item) {
+	return array.indexOf(item) !== -1;
+  });
 }
 
 function inherits(Child, Parent) {

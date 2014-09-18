@@ -38,7 +38,7 @@ var Room = (function () {
 		}
 	}
 
-	function Room(name, type, width, depth) {
+	function Room(name, type, width, depth, objects) {
 		this.name  = name;
 		this.type  = type  || TYPE_DEFAULT;
 		this.width = width || WIDTH_DEFAULT;
@@ -46,8 +46,11 @@ var Room = (function () {
 
 		validateRoom(this.name, this.type, this.width, this.depth);
 
-		this.width = Math.max(WIDTH_DEFAULT, this.width);
-		this.tiles = createTiles(this.depth, this.type);
+		this.width   = Math.max(WIDTH_DEFAULT, this.width);
+		this.tiles   = createTiles(this.depth, this.type);
+		this.objects = objects || [];
+
+		check.should.object.list(this.objects);
 	}
 
 	Room.prototype.updateTiles = function (offset) {

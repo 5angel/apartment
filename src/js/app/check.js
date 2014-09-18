@@ -1,24 +1,51 @@
 var check = (function () {
-	function invalidWhenNot(name, type) {
+	var PAIRS = {
+		'animation': Animation,
+		'sprite': SpriteSheet,
+		'action': Action,
+		'object': GameObject,
+		'room': Room,
+		'level': Level
+	};
+
+	function isInstanceFactory(type) {
 		return function (object) {
-			if (!(object instanceof type)) {
+			return object instanceof type;
+		}
+	}
+
+	var checker = {
+		is: {},
+		should: {}
+	};
+
+	for (var prop in PAIRS) {
+		checker.is[prop] = isInstanceFactory(PAIRS[prop]);
+	}
+
+	function shouldBeFactory(name) {
+		return function (object) {
+			if (!checker.is[name](object)) {
 				throw new Error('invalid', name);
 			}
 		}
 	}
 
-	return {
-		room: invalidWhenNot('room', Room),
-		object: invalidWhenNot('object', GameObject),
-		listOfObjects: function (list) {
-			if (!isArray(list) || (isArray(list) && (list.length === 0 && !list.every(function (object) {
-				return object instanceof GameObject;
-			})))) {
-				throw new Error('invalid list of objects!');
+	function shouldBeListFactory(name) {
+		return function (list) {
+			if (!isArray(list) || (isArray(list) && (list.length > 0 && !list.every(checker.is[name])))) {
+				throw new Error('invalid list of type ' + name);
 			}
-		},
-		animation: invalidWhenNot('animation', Animation),
-		sprite: invalidWhenNot('sprite', SpriteSheet),
-		action: invalidWhenNot('action', Action)
-	};
+		}
+	}
+
+	for (var prop in PAIRS) {
+		var shouldFn = shouldBeFactory(prop);
+
+		shouldFn.list = shouldBeListFactory(prop);
+
+		checker.should[prop] = shouldFn;
+	}
+
+	return checker;
 })();

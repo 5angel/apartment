@@ -1,7 +1,7 @@
 (function () {
-	var STAGE_WIDTH   = 320,
-		STAGE_HEIGHT  = 112,
-		FRAME_STEP = 80;
+	var STAGE_WIDTH  = 320,
+		STAGE_HEIGHT = 112,
+		FRAME_STEP   = 80;
 
 	// define sprites
 	var SPRITES = {};
@@ -61,10 +61,12 @@
 
 	background.setAttribute('class', 'background');
  
-	var currentRoom, loadedObjects, activeObject;
+	var currentLevel, roomIndex, loadedObjects, activeObject;
 
 	function updateView() {
 		var children = Array.prototype.slice.call(stage.childNodes, 0);
+
+		var currentRoom = currentLevel.rooms[roomIndex];
 
 		loadedObjects.forEach(function (object, i) {
 			object.correctSprite(currentRoom.width, object === activeObject ? null : activeObject);
@@ -81,7 +83,7 @@
 			var target = object.sprite.element.target;
 
 			if (hidden && contains(children, target)) {
-				stage.removeChild(target);	// remove hidden elements
+				stage.removeChild(target); // remove hidden elements
 			} else if (!hidden && !contains(children, target)) {
 				stage.appendChild(target); // add visible elements
 			}
@@ -148,18 +150,20 @@
 		}
 	}
 
-	function loadLevel(room, objects) {
-		check.room(room);
-		check.listOfObjects(objects);
+	function loadLevel(level) {
+		currentLevel = level;
 
-		currentRoom   = room;
-		loadedObjects = objects;
-		activeObject  = objects[0];
+		roomIndex = 0;
+
+		var currentRoom = currentLevel.rooms[roomIndex];
+
+		loadedObjects = currentRoom.objects.slice();
+		activeObject  = loadedObjects[0];
 
 		activeObject.sprite.index = 1;
 
 		loadedObjects.forEach(function (object) {
-			object.bound = room.width;
+			object.bound = currentRoom.width;
 			object.sprite.redraw();
 		});
 
@@ -170,14 +174,18 @@
 		stage.appendChild(activeObject.sprite.element.target);
 	}
 
-	var actionDoor = 
-	
-	loadLevel(new Room('blank', null, 840), [
+	var testObjects = [
 		new DynamicObject(SPRITES.hero.clone(), 740, 8),
 		new GameObject(SPRITES.door.clone(), 40),
 		new GameObject(SPRITES.door.clone(), 400),
 		new GameObject(SPRITES.door.clone(), 780)
-	]);
+	];
+
+	var testRoom = new Room('blank', null, 840, 1, testObjects);
+
+	var testLevel = new Level(null, testRoom)
+
+	loadLevel(testLevel);
 
 	setInterval(nextFrame, FRAME_STEP);
 })();
