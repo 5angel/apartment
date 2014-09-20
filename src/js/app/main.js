@@ -30,7 +30,8 @@
 				},
 				{
 					sprite: 'door',
-					scroll: 780
+					scroll: 780,
+					disabled: true
 				}
 			]
 		}
@@ -54,7 +55,7 @@
 
 				validateType(type);
 
-				return new GameObject(sprite.clone(), object.scroll, object.width);
+				return new GameObject(sprite.clone(), object.scroll, object.width, object.disabled);
 			});
 
 			return new Room(room.name || ROOM_NAME_DEFAULT, room.type, room.width, room.depth, objects)

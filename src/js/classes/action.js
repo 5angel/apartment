@@ -1,7 +1,7 @@
 var Action = (function () {
 
 	function Action(name, target, data) {
-		check.should.object(target);
+		check(target).shouldBe(GameObject);
 
 		this.name   = name;
 		this.target = target;

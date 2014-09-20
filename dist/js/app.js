@@ -1,3 +1,7 @@
+function isBoolean(value) {
+	return value === false || value === true;
+}
+
 function isArray(obj) {
 	return Object.prototype.toString.call(obj) === '[object Array]';
 }
@@ -286,7 +290,7 @@ var SpriteSheet = (function () {
 var Action = (function () {
 
 	function Action(name, target, data) {
-		check.should.object(target);
+		check(target).shouldBe(GameObject);
 
 		this.name   = name;
 		this.target = target;
@@ -299,6 +303,12 @@ var GameObject = (function () {
 	var STAGE_WIDTH  = 320,
 		STAGE_HEIGHT = 112,
 		FLOOR_OFFSET = 6;
+
+	function validateDisabled(value) {
+		if (!isBoolean(value)) {
+			throw new Error('disabled value should be a boolean');
+		}
+	}
 
 	function validateScroll(value) {
 		if (!isNumber(value)) {
@@ -326,12 +336,14 @@ var GameObject = (function () {
 		}
 	}
 
-	function GameObject(sprite, scroll, hitWidth) {
+	function GameObject(sprite, scroll, hitWidth, disabled) {
 		this.sprite   = sprite;
 		this.scroll   = scroll || 0;
+		this.disabled = disabled || false;
 
 		check(this.sprite).shouldBe(SpriteSheet);
 
+		validateDisabled(this.disabled);
 		validateScroll(this.scroll);
 
 		hitWidth = hitWidth || 0;
@@ -357,13 +369,15 @@ var GameObject = (function () {
 		};
 
 		this.receiveAction = function (action) {
-			check(action).shoudlBe(Action);
+			if (!this.disabled) {
+				check(action).shouldBe(Action);
 
-			var callback = listeneres[action.name];
+				var callback = listeneres[action.name];
 
-			callback
-				? callback(action)
-				: console.error('Couldn\'t find an action listener for "' + action.name + '"');
+				callback
+					? callback(action)
+					: console.warn('Couldn\'t find an action listener for "' + action.name + '"');
+			}
 		};
 
 		this.getDeltaWidth = function (k) {
@@ -440,7 +454,12 @@ var DynamicObject = (function () {
 	}
 
 	function DynamicObject(sprite, scroll, hitWidth, vStep, vMax) {
-		DynamicObject.superclass.constructor.apply(this, arguments);
+		var args = Array.prototype.slice.call(arguments);
+
+		// fill disabled value
+		args.splice(3, 0, false);
+
+		DynamicObject.superclass.constructor.apply(this, args);
 
 		this.velocity = {
 			step: vStep || VELOCITY_STEP_DEFAULT,
@@ -856,7 +875,8 @@ var gameScreen = (function () {
 				},
 				{
 					sprite: 'door',
-					scroll: 780
+					scroll: 780,
+					disabled: true
 				}
 			]
 		}
@@ -880,7 +900,7 @@ var gameScreen = (function () {
 
 				validateType(type);
 
-				return new GameObject(sprite.clone(), object.scroll, object.width);
+				return new GameObject(sprite.clone(), object.scroll, object.width, object.disabled);
 			});
 
 			return new Room(room.name || ROOM_NAME_DEFAULT, room.type, room.width, room.depth, objects)

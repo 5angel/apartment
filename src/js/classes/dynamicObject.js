@@ -14,7 +14,12 @@ var DynamicObject = (function () {
 	}
 
 	function DynamicObject(sprite, scroll, hitWidth, vStep, vMax) {
-		DynamicObject.superclass.constructor.apply(this, arguments);
+		var args = Array.prototype.slice.call(arguments);
+
+		// fill disabled value
+		args.splice(3, 0, false);
+
+		DynamicObject.superclass.constructor.apply(this, args);
 
 		this.velocity = {
 			step: vStep || VELOCITY_STEP_DEFAULT,

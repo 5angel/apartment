@@ -1,3 +1,7 @@
+function isBoolean(value) {
+	return value === false || value === true;
+}
+
 function isArray(obj) {
 	return Object.prototype.toString.call(obj) === '[object Array]';
 }
