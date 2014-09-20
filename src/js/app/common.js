@@ -3,7 +3,7 @@ function isArray(obj) {
 }
 
 function isNumber(n) {
-	return !isNaN(parseFloat(n)) && isFinite(n);
+	return typeof n === 'number' && !isNaN(parseFloat(n)) && isFinite(n);
 }
 
 function isInt(n) {

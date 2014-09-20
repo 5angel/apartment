@@ -3,7 +3,7 @@ function isArray(obj) {
 }
 
 function isNumber(n) {
-	return !isNaN(parseFloat(n)) && isFinite(n);
+	return typeof n === 'number' && !isNaN(parseFloat(n)) && isFinite(n);
 }
 
 function isInt(n) {
@@ -848,15 +848,15 @@ var gameScreen = (function () {
 			objects: [
 				{
 					sprite: 'door',
-					scroll: '40'
+					scroll: 40
 				},
 				{
 					sprite: 'door',
-					scroll: '400'
+					scroll: 400
 				},
 				{
 					sprite: 'door',
-					scroll: '780'
+					scroll: 780
 				}
 			]
 		}
@@ -887,7 +887,7 @@ var gameScreen = (function () {
 		});
 	}
 
-	var player = new DynamicObject(SPRITES.hero.clone(), 0, 8),
+	var player = new DynamicObject(SPRITES.hero.clone(), 740, 8),
 		rooms  = parseLevelScheme(SCHEME);
 
 	gameScreen.load(rooms, player);
