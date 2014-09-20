@@ -33,7 +33,7 @@ var GameObject = (function () {
 		this.sprite   = sprite;
 		this.scroll   = scroll || 0;
 
-		check.should.sprite(this.sprite);
+		check(this.sprite).shouldBe(SpriteSheet);
 
 		validateScroll(this.scroll);
 
@@ -60,7 +60,7 @@ var GameObject = (function () {
 		};
 
 		this.receiveAction = function (action) {
-			check.should.action(action);
+			check(action).shoudlBe(Action);
 
 			var callback = listeneres[action.name];
 

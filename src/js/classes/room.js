@@ -50,7 +50,7 @@ var Room = (function () {
 		this.tiles   = createTiles(this.depth, this.type);
 		this.objects = objects || [];
 
-		check.should.object.list(this.objects);
+		check(this.objects).shouldBeListOf(GameObject);
 	}
 
 	Room.prototype.updateTiles = function (offset) {

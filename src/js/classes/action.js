@@ -1,7 +1,7 @@
 var Action = (function () {
 
 	function Action(name, target, data) {
-		check.object(target);
+		check.should.object(target);
 
 		this.name   = name;
 		this.target = target;

@@ -178,7 +178,7 @@ var SpriteSheet = (function () {
 			throw new Error('animation without name');
 		}
 
-		check.should.animation(animation);
+		check(animation).shouldBe(Animation);
 	}
 	
 
@@ -286,7 +286,7 @@ var SpriteSheet = (function () {
 var Action = (function () {
 
 	function Action(name, target, data) {
-		check.object(target);
+		check.should.object(target);
 
 		this.name   = name;
 		this.target = target;
@@ -330,7 +330,7 @@ var GameObject = (function () {
 		this.sprite   = sprite;
 		this.scroll   = scroll || 0;
 
-		check.should.sprite(this.sprite);
+		check(this.sprite).shouldBe(SpriteSheet);
 
 		validateScroll(this.scroll);
 
@@ -357,7 +357,7 @@ var GameObject = (function () {
 		};
 
 		this.receiveAction = function (action) {
-			check.should.action(action);
+			check(action).shoudlBe(Action);
 
 			var callback = listeneres[action.name];
 
@@ -453,14 +453,14 @@ var DynamicObject = (function () {
 
 	inherits(DynamicObject, GameObject);
 
-	DynamicObject.prototype.push = function (k, value) {
+	DynamicObject.prototype.pull = function (k, value) {
 		k = k || 1;
 		value = value || this.velocity.step;
 
 		if (!isNumber(k)) {
-			throw new Error('push with invalid factor"');
+			throw new Error('pull with invalid factor"');
 		} else if (!isNumber(value)) {
-			throw new Error('push with invalid value"');
+			throw new Error('pull with invalid value"');
 		}
 
 		value *= k;
@@ -568,7 +568,7 @@ var Room = (function () {
 		this.tiles   = createTiles(this.depth, this.type);
 		this.objects = objects || [];
 
-		check.should.object.list(this.objects);
+		check(this.objects).shouldBeListOf(GameObject);
 	}
 
 	Room.prototype.updateTiles = function (offset) {
@@ -585,85 +585,69 @@ var Room = (function () {
 
 	return Room;
 })();
-var Level = (function () {
-	function Level(options) {
-		this.rooms = Array.prototype.slice.call(arguments).slice(1);
-
-		check.should.room.list(this.rooms);
-	}
-
-	return Level;
-})();
-var check = (function () {
+var Checker = (function () {
 	var PAIRS = {
-		'animation': Animation,
-		'sprite': SpriteSheet,
-		'action': Action,
-		'object': GameObject,
-		'room': Room,
-		'level': Level
+		'Animation': Animation,
+		'SpriteSheet': SpriteSheet,
+		'Action': Action,
+		'GameObject': GameObject,
+		'Room': Room
 	};
 
-	function isInstanceFactory(type) {
-		return function (object) {
+	function Checker(object) {
+		this.object = object;
+	}
+
+	Checker.findNameOf = function (type) {
+		for (var prop in PAIRS) {
+			if (PAIRS[prop] === type) {
+				return prop;
+			}
+		}
+
+		return 'Unknown';
+	}
+
+	Checker.prototype.is = function (type) {
+		return this.object instanceof type;
+	};
+
+	Checker.prototype.shouldBe = function (type) {
+		var target = Checker.findNameOf(type),
+			source = Checker.findNameOf(this.object);
+
+		if (!this.is(type)) {
+			console.info(this.object);
+			throw new Error('expected "' + target + '", got "' + source + '"');
+		}
+	};
+
+	Checker.prototype.shouldBeListOf = function (type) {
+		var target = Checker.findNameOf(type);
+
+		var list = this.object,
+			that = this;
+
+		function is(object) {
 			return object instanceof type;
 		}
-	}
 
-	var checker = {
-		is: {},
-		should: {}
+		if (!isArray(list) || (isArray(list) && (list.length > 0 && !list.every(is)))) {
+			console.info(this.object);
+			throw new Error('expected list of "' + target + '"');
+		}
 	};
 
-	for (var prop in PAIRS) {
-		checker.is[prop] = isInstanceFactory(PAIRS[prop]);
-	}
-
-	function shouldBeFactory(name) {
-		return function (object) {
-			if (!checker.is[name](object)) {
-				throw new Error('invalid', name);
-			}
-		}
-	}
-
-	function shouldBeListFactory(name) {
-		return function (list) {
-			if (!isArray(list) || (isArray(list) && (list.length > 0 && !list.every(checker.is[name])))) {
-				throw new Error('invalid list of type ' + name);
-			}
-		}
-	}
-
-	for (var prop in PAIRS) {
-		var shouldFn = shouldBeFactory(prop);
-
-		shouldFn.list = shouldBeListFactory(prop);
-
-		checker.should[prop] = shouldFn;
-	}
-
-	return checker;
+	return Checker;
 })();
-(function () {
-	var STAGE_WIDTH  = 320,
-		STAGE_HEIGHT = 112,
-		FRAME_STEP   = 80;
 
-	// define sprites
-	var SPRITES = {};
+function check(object) {
+	return new Checker(object);
+}
+var keys = (function () {
+	var pressed = [];
 
-	SPRITES.hero = new SpriteSheet('hero')
-		.addAnimation('idle', new Animation({ width: 37, height: 72 }))
-		.addAnimation('walk', new Animation({ x: 37, width: 37, height: 72, length: 16 }));
-
-	SPRITES.door = new SpriteSheet('door', 0, -10)
-		.addAnimation('idle', new Animation({ width: 40, height: 80 }));
-
-	var pressed = [],
-		sprites = [];
-
-	function getKeyAction(value) {
+	function getKeyType(value) {
 		if (value === 87 || value === 38) {
 			return 'up';
 		} else if (value === 68 || value === 39) {
@@ -675,164 +659,238 @@ var check = (function () {
 		}
 	}
 
-	function onKeyDown(e) {
-		var pending = getKeyAction(e.keyCode);
+	function onKeyDown(event) {
+		var pending = getKeyType(event.keyCode);
 
 		if (pressed.indexOf(pending) === -1) {
 			pressed.push(pending);
 		}
 	}
 
-	function onKeyUp(e) {
-		var index = pressed.indexOf(getKeyAction(e.keyCode));
+	function onKeyUp(event) {
+		var index = pressed.indexOf(getKeyType(event.keyCode));
 
 		if (index !== -1) {
 			pressed.splice(index, 1);
 		}
 	}
 
-	var screen     = document.createElement('div'),
-		stage      = document.createElement('div'),
+	return {
+		bindTo: function (element) {
+			element.addEventListener('keydown', onKeyDown);
+			element.addEventListener('keyup', onKeyUp);
+		},
+		getLast: function () {
+			return pressed[pressed.length - 1];
+		},
+		hasKey: function (value) {
+			return contains(pressed, value);
+		}
+	}
+})();
+var gameScreen = (function () {
+	var STAGE_WIDTH  = 320,
+		STAGE_HEIGHT = 112;
+
+	var roomList = [],
+		roomIndex = 0;
+
+	var loadedObjects = [],
+		objectActive  = null;
+
+	var container  = document.createElement('div'),
+		stage      = document.createElement('div')
 		background = document.createElement('div');
 
-	document.body.appendChild(screen);
-
-	screen.setAttribute('id', 'screen');
-	screen.setAttribute('tabindex', 0);
-	screen.appendChild(stage);
-	screen.appendChild(background);
-	screen.addEventListener('keydown', onKeyDown);
-	screen.addEventListener('keyup', onKeyUp);
-
 	stage.setAttribute('class', 'stage');
-
 	background.setAttribute('class', 'background');
- 
-	var currentLevel, roomIndex, loadedObjects, activeObject;
 
-	function updateView() {
-		var children = Array.prototype.slice.call(stage.childNodes, 0);
+	container.setAttribute('id', 'screen');
+	container.setAttribute('tabindex', 0);
+	container.appendChild(stage);
+	container.appendChild(background);
 
-		var currentRoom = currentLevel.rooms[roomIndex];
-
-		loadedObjects.forEach(function (object, i) {
-			object.correctSprite(currentRoom.width, object === activeObject ? null : activeObject);
-			object.sprite.step();
-			object.sprite.update();
-
-			var x = object.sprite.x,
-			    y = object.sprite.y;
-			var width  = object.sprite.getFrameWidth(),
-				height = object.sprite.getFrameHeight();
-
-			var hidden = x + width < 0 || x >= STAGE_WIDTH || y + height < 0 || y >= STAGE_HEIGHT;
-
-			var target = object.sprite.element.target;
-
-			if (hidden && contains(children, target)) {
-				stage.removeChild(target); // remove hidden elements
-			} else if (!hidden && !contains(children, target)) {
-				stage.appendChild(target); // add visible elements
-			}
-		});
-
-		var delta = Math.floor(activeObject.getDeltaWidth(2));
-
-		var x = 0;
-
-		if (activeObject.scroll + delta >= currentRoom.width) {
-			x = currentRoom.width - (delta * 2);
-		} else if (activeObject.scroll >= delta) {
-			x = Math.floor(activeObject.scroll) - delta;
-		}
-
-		currentRoom.updateTiles(x);
-	}
+	keys.bindTo(container);
 
 	var hold = false;
 
-	function nextFrame() {
-		var action = pressed[pressed.length - 1];
+	function performActionWith(host, type) {
+		var target = loadedObjects.filter(function (object) {
+			var left  = host.scroll >= object.scroll - object.getHitWidth(),
+			    right = host.scroll + host.getHitWidth() <= object.scroll + object.getHitWidth()
 
-		switch (action) {
+			return left && right && object !== host;
+		})[0];
+
+		if (target) {
+			target.receiveAction(host.createAction(type));
+		}
+	}
+
+	function updateActiveObject() {
+		switch (keys.getLast()) {
 			case 'right':
-				activeObject.push(-1);
+				objectActive.pull(-1);
 				break;
 			case 'left':
-				activeObject.push();
+				objectActive.pull();
 				break;
 			case 'down':
 				if (!hold) {
-					performActionWith(activeObject);
+					performActionWith(objectActive, 'interact');
 				}
 
-				activeObject.wait();
+				objectActive.wait();
 				break;
 			default:
-				activeObject.wait();
+				objectActive.wait();
 				break;
 		}
 
-		hold = contains(pressed, 'down');
-
-		updateView();
+		hold = keys.hasKey('down');
 	}
 
-	function locateObjectAt(relative) {
-		var nearby = loadedObjects.filter(function (object) {
-			var left  = relative.scroll >= object.scroll - object.getHitWidth(),
-			    right = relative.scroll + relative.getHitWidth() <= object.scroll + object.getHitWidth()
+	return {
+		load: function (rooms, target) {
+			roomList     = rooms;
+			objectActive = target;
 
-			return left && right && object !== relative;
-		});
+			check(roomList).shouldBeListOf(Room);
+			check(objectActive).shouldBe(GameObject);
 
-		return nearby[0];
-	}
+			objectActive.sprite.index = 1;
 
-	function performActionWith(object) {
-		var target = locateObjectAt(object);
+			roomIndex = 0;
 
-		if (target) {
-			target.receiveAction(object.createAction('interact'));
+			var roomActive = roomList[roomIndex];
+
+			Array.prototype.push.apply(loadedObjects, roomActive.objects.slice())
+			loadedObjects.push(objectActive);
+
+			loadedObjects.forEach(function (object) {
+				object.bound = roomActive.width;
+				object.sprite.redraw();
+			});
+
+			roomActive.tiles.forEach(function (tile) {
+				background.appendChild(tile);
+			});
+
+			stage.appendChild(objectActive.sprite.element.target);
+		},
+		next: function () {
+			updateActiveObject();
+
+			var roomActive = roomList[roomIndex];
+
+			var children = Array.prototype.slice.call(stage.childNodes, 0);
+
+			loadedObjects.forEach(function (object, i) {
+				object.correctSprite(roomActive.width, object === objectActive ? null : objectActive);
+				object.sprite.step();
+				object.sprite.update();
+
+				var x = object.sprite.x,
+					y = object.sprite.y;
+
+				var width  = object.sprite.getFrameWidth(),
+					height = object.sprite.getFrameHeight();
+
+				var hidden = x + width < 0 || x >= STAGE_WIDTH || y + height < 0 || y >= STAGE_HEIGHT;
+
+				var target = object.sprite.element.target;
+
+				if (hidden && contains(children, target)) {
+					stage.removeChild(target); // remove hidden elements
+				} else if (!hidden && !contains(children, target)) {
+					stage.appendChild(target); // add visible elements
+				}
+			});
+
+			var delta = Math.floor(objectActive.getDeltaWidth(2));
+
+			var x = 0;
+
+			if (objectActive.scroll + delta >= roomActive.width) {
+				x = roomActive.width - (delta * 2);
+			} else if (objectActive.scroll >= delta) {
+				x = Math.floor(objectActive.scroll) - delta;
+			}
+
+			roomActive.updateTiles(x);
+		},
+		getContainer: function () {
+			return container;
+		}
+	};
+})();
+(function () {
+	var FRAME_STEP = 80;
+
+	var OBJECT_TYPE_ACCEPTED = [GameObject, DynamicObject],
+	    OBJECT_TYPE_DEFAULT  = OBJECT_TYPE_ACCEPTED[0];
+
+	var ROOM_NAME_DEFAULT = 'blank';
+
+	// define sprites
+	var SPRITES = {};
+
+	SPRITES.hero = new SpriteSheet('hero')
+		.addAnimation('idle', new Animation({ width: 37, height: 72 }))
+		.addAnimation('walk', new Animation({ x: 37, width: 37, height: 72, length: 16 }));
+
+	SPRITES.door = new SpriteSheet('door', 0, -10)
+		.addAnimation('idle', new Animation({ width: 40, height: 80 }));
+
+	var SCHEME = [
+		{
+			width: 840,
+			objects: [
+				{
+					sprite: 'door',
+					scroll: '40'
+				},
+				{
+					sprite: 'door',
+					scroll: '400'
+				},
+				{
+					sprite: 'door',
+					scroll: '780'
+				}
+			]
+		}
+	];
+
+	document.body.appendChild(gameScreen.getContainer());
+
+	function validateType(type) {
+		if (!contains(OBJECT_TYPE_ACCEPTED, type)) {
+			throw new Error('type "' + Checker.findNameOf(type) + '" is not accepted');
 		}
 	}
 
-	function loadLevel(level) {
-		currentLevel = level;
+	function parseLevelScheme(scheme) {
+		var namesUsed = [];
 
-		roomIndex = 0;
+		return scheme.map(function (room, i) {
+			var objects = room.objects.map(function (object) {
+				var type   = object.type || OBJECT_TYPE_DEFAULT,
+					sprite = SPRITES[object.sprite] || SPRITES.hero;
 
-		var currentRoom = currentLevel.rooms[roomIndex];
+				validateType(type);
 
-		loadedObjects = currentRoom.objects.slice();
-		activeObject  = loadedObjects[0];
+				return new GameObject(sprite.clone(), object.scroll, object.width);
+			});
 
-		activeObject.sprite.index = 1;
-
-		loadedObjects.forEach(function (object) {
-			object.bound = currentRoom.width;
-			object.sprite.redraw();
+			return new Room(room.name || ROOM_NAME_DEFAULT, room.type, room.width, room.depth, objects)
 		});
-
-		currentRoom.tiles.forEach(function (tile) {
-			background.appendChild(tile);
-		});
-
-		stage.appendChild(activeObject.sprite.element.target);
 	}
 
-	var testObjects = [
-		new DynamicObject(SPRITES.hero.clone(), 740, 8),
-		new GameObject(SPRITES.door.clone(), 40),
-		new GameObject(SPRITES.door.clone(), 400),
-		new GameObject(SPRITES.door.clone(), 780)
-	];
+	var player = new DynamicObject(SPRITES.hero.clone(), 0, 8),
+		rooms  = parseLevelScheme(SCHEME);
 
-	var testRoom = new Room('blank', null, 840, 1, testObjects);
+	gameScreen.load(rooms, player);
 
-	var testLevel = new Level(null, testRoom)
-
-	loadLevel(testLevel);
-
-	setInterval(nextFrame, FRAME_STEP);
+	setInterval(gameScreen.next, FRAME_STEP);
 })();

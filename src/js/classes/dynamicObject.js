@@ -27,14 +27,14 @@ var DynamicObject = (function () {
 
 	inherits(DynamicObject, GameObject);
 
-	DynamicObject.prototype.push = function (k, value) {
+	DynamicObject.prototype.pull = function (k, value) {
 		k = k || 1;
 		value = value || this.velocity.step;
 
 		if (!isNumber(k)) {
-			throw new Error('push with invalid factor"');
+			throw new Error('pull with invalid factor"');
 		} else if (!isNumber(value)) {
-			throw new Error('push with invalid value"');
+			throw new Error('pull with invalid value"');
 		}
 
 		value *= k;

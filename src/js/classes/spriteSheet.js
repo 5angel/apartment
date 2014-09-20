@@ -16,7 +16,7 @@ var SpriteSheet = (function () {
 			throw new Error('animation without name');
 		}
 
-		check.should.animation(animation);
+		check(animation).shouldBe(Animation);
 	}
 	
 
