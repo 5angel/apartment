@@ -171,27 +171,12 @@ var SpriteSheet = (function () {
 	var CLASS_BASE    = 'stage__sprite',
 	    CLASS_FLIPPED = CLASS_BASE + '_style_flipped';
 
-	function validateOffsets(x, y) {
-		if  (!isInt(x) || !isInt(y)) {
-			throw new Error('Offset values should be integers');
-		}
-	}
-
-	function validateAnimation(name, animation) {
-		if  (!isValidString(name)) {
-			throw new Error('animation without name');
-		}
-
-		check(animation).shouldBe(Animation);
-	}
-	
+	var _check = check.bind(null, 'SpriteSheet');
 
 	function SpriteSheet(name, offsetX, offsetY, presets) {
 		this.name = name;
 
-		if  (!isValidString(this.name)) {
-			throw new Error('sprite sheet without a name');
-		}
+		_check(this.name, 'sprite sheet name').toBeNonBlankString();
 
 		this.offsetX = offsetX || 0;
 		this.offsetY = offsetY || 0;
@@ -210,11 +195,13 @@ var SpriteSheet = (function () {
 		presets = presets || {};
 
 		this.addAnimation = function (name, animation) {
-			validateAnimation(name, animation);
+			_check(name, 'animation name').toBeNonBlankString();
+			_check(animation).toBe(Animation);
 
 			presets[name]   = animation;
 			presets.initial = presets.initial || name;
-			this.animation  = name;
+
+			this.animation = name;
 
 			this.redraw();
 
@@ -289,12 +276,17 @@ var SpriteSheet = (function () {
 })();
 var Action = (function () {
 
-	function Action(name, target, data) {
-		check(target).shouldBe(GameObject);
+	var _check = check.bind(null, 'Action')
 
+	function Action(name, source, target, data) {
 		this.name   = name;
+		this.source = source;
 		this.target = target;
-		this.data   = data;
+		this.data   = data || null;
+
+		_check(name).toBeNonBlankString();
+		_check(source).toBe(GameObject);
+		_check(target).toBe(GameObject);
 	}
 
 	return Action;
@@ -304,94 +296,67 @@ var GameObject = (function () {
 		STAGE_HEIGHT = 112,
 		FLOOR_OFFSET = 6;
 
-	function validateDisabled(value) {
-		if (!isBoolean(value)) {
-			throw new Error('disabled value should be a boolean');
+	var _check = check.bind(null, 'GameObject');
+
+	function addActionListener(listeneres, name, callback) {
+		_check(name, 'action listener name').toBeNonBlankString();
+		_check(callback, 'action callback').toBeFunction();
+
+		if (listeneres[name] !== undefined) {
+			console.warn('a receiver with name "' + name + '" already exists, overwriting');
+		}
+
+		listeneres[name] = callback;
+	}
+
+	function receiveAction(listeneres, action) {
+		if (!this.disabled) {
+			_check(action).toBe(Action);
+
+			var callback = listeneres[action.name];
+
+			callback
+				? callback(action)
+				: console.warn('Couldn\'t find an action listener for "' + action.name + '"');
 		}
 	}
 
-	function validateScroll(value) {
-		if (!isNumber(value)) {
-			throw new Error('scroll value should be a number');
-		} else if (value < 0) {
-			throw new Error('scroll value cannot be lower than 0');
-		}
-	}
-
-	function validateHitWidth(value) {
-		if (!isInt(value)) {
-			throw new Error('hit width should be an integer');
-		} else if (value < 0) {
-			throw new Error('hit width cannot be lower than 0');
-		}
-	}
-
-	function validateActionListener(name, callback) {
-		if (!isValidString(name)) {
-			throw new Error('action receiver should have a valid name');
-		}
-
-		if (!isFunction(callback)) {
-			throw new Error('action callback should be a function');
-		}
-	}
-
-	function GameObject(sprite, scroll, hitWidth, disabled) {
+	function GameObject(name, sprite, scroll, hitWidth, disabled) {
+		this.name     = name;
 		this.sprite   = sprite;
 		this.scroll   = scroll || 0;
+		this.hitWidth = hitWidth || 0;
 		this.disabled = disabled || false;
 
-		check(this.sprite).shouldBe(SpriteSheet);
-
-		validateDisabled(this.disabled);
-		validateScroll(this.scroll);
-
-		hitWidth = hitWidth || 0;
-
-		validateHitWidth(hitWidth);
+		_check(this.name, 'name').toBeNonBlankString();
+		_check(this.sprite).toBe(SpriteSheet);
+		_check(this.scroll, 'scroll').toBePositiveInt();
+		_check(this.hitWidth, 'hit width').toBePositiveInt();
+		_check(this.disabled, 'disabled').toBeBoolean();
 
 		var listeneres = {};
 
-		this.getHitWidth = function () {
-			return !hitWidth
-				? Math.floor(this.sprite.getFrameWidth() / 2)
-				: hitWidth;
-		};
-
-		this.addActionListener = function (name, callback) {
-			validateActionListener(name, callback);
-
-			if (listeneres[name] !== undefined) {
-				console.warn('a receiver with name "' + name + '" already exists, overwriting');
-			}
-
-			listeneres[name] = callback;
-		};
-
-		this.receiveAction = function (action) {
-			if (!this.disabled) {
-				check(action).shouldBe(Action);
-
-				var callback = listeneres[action.name];
-
-				callback
-					? callback(action)
-					: console.warn('Couldn\'t find an action listener for "' + action.name + '"');
-			}
-		};
-
-		this.getDeltaWidth = function (k) {
-			k = k || 1;
-
-			return (STAGE_WIDTH / k) - Math.ceil(this.sprite.getFrameWidth() / k);
-		};
-
-		this.getDeltaHeight = function (k) {
-			k = k || 1;
-
-			return (STAGE_HEIGHT / k) - Math.ceil(this.sprite.getFrameHeight() / k) - FLOOR_OFFSET;
-		};
+		this.addActionListener = addActionListener.bind(this, listeneres);
+		this.receiveAction     = receiveAction.bind(this, listeneres);
 	}
+
+	GameObject.prototype.getHitWidth = function () {
+		return !this.hitWidth
+			? Math.floor(this.sprite.getFrameWidth() / 2)
+			: this.hitWidth;
+	};
+
+	GameObject.prototype.getDeltaWidth = function (k) {
+		k = k || 1;
+
+		return (STAGE_WIDTH / k) - Math.ceil(this.sprite.getFrameWidth() / k);
+	};
+
+	GameObject.prototype.getDeltaHeight = function (k) {
+		k = k || 1;
+
+		return (STAGE_HEIGHT / k) - Math.ceil(this.sprite.getFrameHeight() / k) - FLOOR_OFFSET;
+	};
 
 	GameObject.prototype.leftCornerReached = function () {
 	  return this.scroll < this.getDeltaWidth(2);
@@ -408,14 +373,14 @@ var GameObject = (function () {
 
 		this.sprite.y = this.getDeltaHeight();
 
-		var rightmost = Math.floor(this.scroll + this.getDeltaWidth() - length) - 1, // correct missing pixel
+		var rightmost = Math.floor(this.scroll + this.getDeltaWidth() - length),
 			leftmost  = Math.floor(this.scroll);
 
 		if (relative) { // object provided, position sprite relative to it
 			if (!relative.leftCornerReached() && !relative.rightCornerReached(length)) {
 				this.sprite.x = this.getDeltaWidth(2) - Math.floor(relative.scroll - this.scroll);
 			} else {
-				this.sprite.x = relative.rightCornerReached(length) ? rightmost : leftmost;
+				this.sprite.x = relative.rightCornerReached(length) ? rightmost + 1 : leftmost - 1; // correct missing pixel
 			}
 		} else { // no object provided, position sprite relative to bounds
 			if (!this.leftCornerReached() && !this.rightCornerReached(length)) {
@@ -428,12 +393,12 @@ var GameObject = (function () {
 		this.sprite.update();
 	};
 
-	GameObject.prototype.createAction = function (name) {
+	GameObject.prototype.createAction = function (name, target) {
 		if (!isValidString(name)) {
-			throw new Error('action should have a name');
+			throw new Error('action to have a name');
 		}
 
-		return new Action(name, this);
+		return new Action(name, this, target);
 	};
 
 	return GameObject;
@@ -453,17 +418,12 @@ var DynamicObject = (function () {
 		}
 	}
 
-	function DynamicObject(sprite, scroll, hitWidth, vStep, vMax) {
-		var args = Array.prototype.slice.call(arguments);
-
-		// fill disabled value
-		args.splice(3, 0, false);
-
-		DynamicObject.superclass.constructor.apply(this, args);
+	function DynamicObject(name, sprite, scroll, hitWidth, vStep, vMax) {
+		DynamicObject.superclass.constructor.apply(this, [name, sprite, scroll, hitWidth, false]);
 
 		this.velocity = {
 			step: vStep || VELOCITY_STEP_DEFAULT,
-			max:  vMax || VELOCITY_MAX_DEFAULT,
+			max:  vMax  || VELOCITY_MAX_DEFAULT,
 			value: 0
 		};
 
@@ -497,7 +457,7 @@ var DynamicObject = (function () {
 			this.sprite.flip();
 		}
 
-		if (this.scroll < 0 || this.scroll > this.bound) {
+		if ((this.scroll < 0) || (this.scroll > this.bound)) {
 			this.scroll = Math.min(this.bound, Math.max(0, this.scroll));
 			v.value = 0;
 		}
@@ -537,11 +497,14 @@ var DynamicObject = (function () {
 })();
 var Room = (function () {
 	var WIDTH_DEFAULT = 320;
+
 	var TYPE_DEFAULT = 'base',
 		SRC_BASE     = 'url(\'dist/i/tiles/',
 		SRC_TAIL     = '.png\')',
 		CLASS_BASE   = 'background__tile';
 
+	var _check = check.bind(null, 'Room');
+	
 	function createTiles(count, type) {
 		var tiles = [];
 
@@ -557,37 +520,22 @@ var Room = (function () {
 		return tiles;
 	}
 
-	function validateRoom(name, type, width, depth) {
-		if (!isValidString(name)) {
-			throw new Error('Room without a name!');
-		}
-
-		if (!isValidString(type)) {
-			throw new Error('Room with invalid type');
-		}
-
-		if (!isInt(width)) {
-			throw new Error('Room with invalid width');
-		}
-
-		if (!isInt(depth)) {
-			throw new Error('Room with invalid depth');
-		}
-	}
-
 	function Room(name, type, width, depth, objects) {
 		this.name  = name;
 		this.type  = type  || TYPE_DEFAULT;
 		this.width = width || WIDTH_DEFAULT;
 		this.depth = depth || 1;
 
-		validateRoom(this.name, this.type, this.width, this.depth);
+		_check(this.name).toBeNonBlankString();
+		_check(this.type).toBeNonBlankString();
+		_check(this.width).toBePositiveInt();
+		_check(this.depth).toBePositiveInt();
 
 		this.width   = Math.max(WIDTH_DEFAULT, this.width);
 		this.tiles   = createTiles(this.depth, this.type);
 		this.objects = objects || [];
 
-		check(this.objects).shouldBeListOf(GameObject);
+		_check(this.objects).toBeListOf(GameObject);
 	}
 
 	Room.prototype.updateTiles = function (offset) {
@@ -613,13 +561,33 @@ var Checker = (function () {
 		'Room': Room
 	};
 
-	function Checker(object) {
-		this.object = object;
+	var ERROR_STRING_NON_BLANK = 'value should be a non blank string',
+		ERROR_INTEGER          = 'value should be an integer',
+		ERROR_NUMBER_POSITIVE  = 'value cannot be lower than zero"',
+		ERROR_BOOLEAN          = 'value should be a boolean',
+		ERROR_FUNCTION         = 'should be a function',
+		ERROR_ARRAY            = 'should be an array';
+		
+
+	function Checker(source, target, name) {
+		this.source = source;
+		this.target = target;
+		this.name   = name || 'null';
+
+		if (!isValidString(this.source)) {
+			throw new Error('Checker: "source" ' + ERROR_STRING_NON_BLANK);
+		}
+
+		if (!isValidString(this.name)) {
+			throw new Error('Checker: "name" ' + ERROR_STRING_NON_BLANK);
+		}
 	}
 
 	Checker.findNameOf = function (type) {
 		for (var prop in PAIRS) {
 			if (PAIRS[prop] === type) {
+				return prop;
+			} else if (type instanceof PAIRS[prop]) {
 				return prop;
 			}
 		}
@@ -628,23 +596,23 @@ var Checker = (function () {
 	}
 
 	Checker.prototype.is = function (type) {
-		return this.object instanceof type;
+		return this.target instanceof type;
 	};
 
-	Checker.prototype.shouldBe = function (type) {
+	Checker.prototype.toBe = function (type) {
 		var target = Checker.findNameOf(type),
-			source = Checker.findNameOf(this.object);
+			source = Checker.findNameOf(this.target);
 
 		if (!this.is(type)) {
-			console.info(this.object);
-			throw new Error('expected "' + target + '", got "' + source + '"');
+			console.info(this.target);
+			throw new Error(this.source + ': expected "' + target + '", got "' + source + '"');
 		}
 	};
 
-	Checker.prototype.shouldBeListOf = function (type) {
+	Checker.prototype.toBeListOf = function (type) {
 		var target = Checker.findNameOf(type);
 
-		var list = this.object,
+		var list = this.target,
 			that = this;
 
 		function is(object) {
@@ -652,16 +620,53 @@ var Checker = (function () {
 		}
 
 		if (!isArray(list) || (isArray(list) && (list.length > 0 && !list.every(is)))) {
-			console.info(this.object);
-			throw new Error('expected list of "' + target + '"');
+			console.info(this.target);
+			throw new Error(this.source + ': expected list of "' + target + '"');
+		}
+	};
+
+	Checker.prototype.toBePositiveInt = function () {
+		if (!isInt(this.target)) {
+			throw new Error(this.source + ': "' + this.name + '" ' + ERROR_INTEGER);
+		} else if (this.target < 0) {
+			throw new Error(this.source + ': "' + this.name + '" ' + ERROR_NUMBER_POSITIVE);
+		}
+	};
+
+	Checker.prototype.toBeBoolean = function () {
+		if (!isBoolean(this.target)) {
+			throw new Error(this.source + ': "' + this.name + '" ' + ERROR_BOOLEAN);
+		}
+	};
+
+	Checker.prototype.toBeNonBlankString = function () {
+		if (!isValidString(this.target)) {
+			throw new Error(this.source + ': "' + this.name + '" ' + ERROR_STRING_NON_BLANK);
+		}
+	};
+
+	Checker.prototype.toBeFunction = function () {
+		if (!isFunction(this.target)) {
+			throw new Error(this.source + ': "' + this.name + '" ' + ERROR_FUNCTION);
+		}
+	};
+
+	Checker.prototype.toBePresentIn = function (list) {
+		if (!isArray(list)) {
+			throw new Error('Checker: "list" ' + ERROR_ARRAY);
+		}
+
+		if (!contains(list, this.target)) {
+			console.error(this.source + ': couldn\'t find', this.target, 'in', list);
+			throw new Error(this.source + ': not found');
 		}
 	};
 
 	return Checker;
 })();
 
-function check(object) {
-	return new Checker(object);
+function check(source, target, name) {
+	return new Checker(source, target, name);
 }
 var keys = (function () {
 	var pressed = [];
@@ -733,6 +738,8 @@ var gameScreen = (function () {
 
 	var hold = false;
 
+	var _check = check.bind(null, 'Game screen');
+
 	function performActionWith(host, type) {
 		var target = loadedObjects.filter(function (object) {
 			var left  = host.scroll >= object.scroll - object.getHitWidth(),
@@ -742,7 +749,7 @@ var gameScreen = (function () {
 		})[0];
 
 		if (target) {
-			target.receiveAction(host.createAction(type));
+			target.receiveAction(host.createAction(type, target));
 		}
 	}
 
@@ -769,33 +776,63 @@ var gameScreen = (function () {
 		hold = keys.hasKey('down');
 	}
 
+	function emptyScreen() {
+		new Array(stage, background).forEach(function (element) {
+			while (element.firstChild) {
+				element.removeChild(element.firstChild);
+			}
+		});
+	}
+
+	function changeRoomTo(index) {
+		if (index >= roomList.length) {
+			throw new Error('Game screen: room index is out of range');
+		}
+
+		emptyScreen();
+
+		roomIndex = index;
+		loadedObjects = [];
+
+		var roomActive = roomList[roomIndex];
+
+		Array.prototype.push.apply(loadedObjects, roomActive.objects.slice())
+		loadedObjects.push(objectActive);
+
+		loadedObjects.forEach(function (object) {
+			object.bound = roomActive.width;
+			object.sprite.redraw();
+		});
+
+		roomActive.tiles.forEach(function (tile) {
+			background.appendChild(tile);
+		});
+
+		stage.appendChild(objectActive.sprite.element.target);
+	}
+
 	return {
-		load: function (rooms, target) {
+		load: function (rooms, target, spawn) {
 			roomList     = rooms;
 			objectActive = target;
+			spawn        = spawn || 0;
 
-			check(roomList).shouldBeListOf(Room);
-			check(objectActive).shouldBe(GameObject);
+			_check(roomList, 'room list').toBeListOf(Room);
+			_check(objectActive, 'active object').toBe(GameObject);
+			_check(spawn, 'spawn').toBePositiveInt();
 
+			objectActive.scroll = spawn;
 			objectActive.sprite.index = 1;
 
-			roomIndex = 0;
+			changeRoomTo(0);
+		},
+		change: function (index, scroll) {
+			_check(index, 'index').toBePositiveInt();
+			_check(scroll, 'scroll').toBePositiveInt();
 
-			var roomActive = roomList[roomIndex];
+			objectActive.scroll = scroll;
 
-			Array.prototype.push.apply(loadedObjects, roomActive.objects.slice())
-			loadedObjects.push(objectActive);
-
-			loadedObjects.forEach(function (object) {
-				object.bound = roomActive.width;
-				object.sprite.redraw();
-			});
-
-			roomActive.tiles.forEach(function (tile) {
-				background.appendChild(tile);
-			});
-
-			stage.appendChild(objectActive.sprite.element.target);
+			changeRoomTo(index);
 		},
 		next: function () {
 			updateActiveObject();
@@ -849,6 +886,8 @@ var gameScreen = (function () {
 	var OBJECT_TYPE_ACCEPTED = [GameObject, DynamicObject],
 	    OBJECT_TYPE_DEFAULT  = OBJECT_TYPE_ACCEPTED[0];
 
+	var ACTION_TYPE_ACCEPTED = ['level'];
+
 	var ROOM_NAME_DEFAULT = 'blank';
 
 	// define sprites
@@ -867,11 +906,18 @@ var gameScreen = (function () {
 			objects: [
 				{
 					sprite: 'door',
-					scroll: 40
+					scroll: 40,
+					disabled: true
 				},
 				{
 					sprite: 'door',
-					scroll: 400
+					scroll: 400,
+					actions: {
+						interact: {
+							type: 'level',
+							index: 1
+						}
+					}
 				},
 				{
 					sprite: 'door',
@@ -879,14 +925,39 @@ var gameScreen = (function () {
 					disabled: true
 				}
 			]
+		},
+		{
+			width: 320,
+			objects: [
+				{
+					sprite: 'door',
+					scroll: 160
+				}
+			]
 		}
 	];
 
 	document.body.appendChild(gameScreen.getContainer());
 
-	function validateType(type) {
-		if (!contains(OBJECT_TYPE_ACCEPTED, type)) {
-			throw new Error('type "' + Checker.findNameOf(type) + '" is not accepted');
+	function parseActionCallback(scheme) {
+		var _check = check.bind(null, 'Parse action callback');
+	
+		_check(scheme.type, 'type').toBePresentIn(ACTION_TYPE_ACCEPTED);
+
+		switch (scheme.type) {
+			case 'level':
+				return function (action) {
+					var index  = scheme.index  || 0,
+						scroll = scheme.scroll || 0;
+				
+					_check(index, 'index').toBePositiveInt();
+					_check(scroll, 'scroll').toBePositiveInt();
+
+					gameScreen.change(index, scroll);
+					
+					console.log('It works!', scheme, action);
+				};
+				break;
 		}
 	}
 
@@ -894,23 +965,30 @@ var gameScreen = (function () {
 		var namesUsed = [];
 
 		return scheme.map(function (room, i) {
-			var objects = room.objects.map(function (object) {
+			var objects = room.objects.map(function (object, i) {
 				var type   = object.type || OBJECT_TYPE_DEFAULT,
+					name   = object.name || '#' + i.toString(),
 					sprite = SPRITES[object.sprite] || SPRITES.hero;
 
-				validateType(type);
+				check('Parse function', type).toBePresentIn(OBJECT_TYPE_ACCEPTED);
 
-				return new GameObject(sprite.clone(), object.scroll, object.width, object.disabled);
+				var parsed = new GameObject(name, sprite.clone(), object.scroll, object.width, object.disabled);
+
+				for (var prop in object.actions) {
+					parsed.addActionListener(prop, parseActionCallback(object.actions[prop]));
+				}
+
+				return parsed;
 			});
 
 			return new Room(room.name || ROOM_NAME_DEFAULT, room.type, room.width, room.depth, objects)
 		});
 	}
 
-	var player = new DynamicObject(SPRITES.hero.clone(), 740, 8),
+	var player = new DynamicObject('hero', SPRITES.hero.clone(), 0, 8, false),
 		rooms  = parseLevelScheme(SCHEME);
 
-	gameScreen.load(rooms, player);
+	gameScreen.load(rooms, player, 740);
 
 	setInterval(gameScreen.next, FRAME_STEP);
 })();

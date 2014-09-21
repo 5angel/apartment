@@ -4,6 +4,8 @@
 	var OBJECT_TYPE_ACCEPTED = [GameObject, DynamicObject],
 	    OBJECT_TYPE_DEFAULT  = OBJECT_TYPE_ACCEPTED[0];
 
+	var ACTION_TYPE_ACCEPTED = ['level'];
+
 	var ROOM_NAME_DEFAULT = 'blank';
 
 	// define sprites
@@ -22,11 +24,18 @@
 			objects: [
 				{
 					sprite: 'door',
-					scroll: 40
+					scroll: 40,
+					disabled: true
 				},
 				{
 					sprite: 'door',
-					scroll: 400
+					scroll: 400,
+					actions: {
+						interact: {
+							type: 'level',
+							index: 1
+						}
+					}
 				},
 				{
 					sprite: 'door',
@@ -34,14 +43,39 @@
 					disabled: true
 				}
 			]
+		},
+		{
+			width: 320,
+			objects: [
+				{
+					sprite: 'door',
+					scroll: 160
+				}
+			]
 		}
 	];
 
 	document.body.appendChild(gameScreen.getContainer());
 
-	function validateType(type) {
-		if (!contains(OBJECT_TYPE_ACCEPTED, type)) {
-			throw new Error('type "' + Checker.findNameOf(type) + '" is not accepted');
+	function parseActionCallback(scheme) {
+		var _check = check.bind(null, 'Parse action callback');
+	
+		_check(scheme.type, 'type').toBePresentIn(ACTION_TYPE_ACCEPTED);
+
+		switch (scheme.type) {
+			case 'level':
+				return function (action) {
+					var index  = scheme.index  || 0,
+						scroll = scheme.scroll || 0;
+				
+					_check(index, 'index').toBePositiveInt();
+					_check(scroll, 'scroll').toBePositiveInt();
+
+					gameScreen.change(index, scroll);
+					
+					console.log('It works!', scheme, action);
+				};
+				break;
 		}
 	}
 
@@ -49,23 +83,30 @@
 		var namesUsed = [];
 
 		return scheme.map(function (room, i) {
-			var objects = room.objects.map(function (object) {
+			var objects = room.objects.map(function (object, i) {
 				var type   = object.type || OBJECT_TYPE_DEFAULT,
+					name   = object.name || '#' + i.toString(),
 					sprite = SPRITES[object.sprite] || SPRITES.hero;
 
-				validateType(type);
+				check('Parse function', type).toBePresentIn(OBJECT_TYPE_ACCEPTED);
 
-				return new GameObject(sprite.clone(), object.scroll, object.width, object.disabled);
+				var parsed = new GameObject(name, sprite.clone(), object.scroll, object.width, object.disabled);
+
+				for (var prop in object.actions) {
+					parsed.addActionListener(prop, parseActionCallback(object.actions[prop]));
+				}
+
+				return parsed;
 			});
 
 			return new Room(room.name || ROOM_NAME_DEFAULT, room.type, room.width, room.depth, objects)
 		});
 	}
 
-	var player = new DynamicObject(SPRITES.hero.clone(), 740, 8),
+	var player = new DynamicObject('hero', SPRITES.hero.clone(), 0, 8, false),
 		rooms  = parseLevelScheme(SCHEME);
 
-	gameScreen.load(rooms, player);
+	gameScreen.load(rooms, player, 740);
 
 	setInterval(gameScreen.next, FRAME_STEP);
 })();

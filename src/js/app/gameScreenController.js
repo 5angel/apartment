@@ -24,6 +24,8 @@ var gameScreen = (function () {
 
 	var hold = false;
 
+	var _check = check.bind(null, 'Game screen');
+
 	function performActionWith(host, type) {
 		var target = loadedObjects.filter(function (object) {
 			var left  = host.scroll >= object.scroll - object.getHitWidth(),
@@ -33,7 +35,7 @@ var gameScreen = (function () {
 		})[0];
 
 		if (target) {
-			target.receiveAction(host.createAction(type));
+			target.receiveAction(host.createAction(type, target));
 		}
 	}
 
@@ -60,33 +62,63 @@ var gameScreen = (function () {
 		hold = keys.hasKey('down');
 	}
 
+	function emptyScreen() {
+		new Array(stage, background).forEach(function (element) {
+			while (element.firstChild) {
+				element.removeChild(element.firstChild);
+			}
+		});
+	}
+
+	function changeRoomTo(index) {
+		if (index >= roomList.length) {
+			throw new Error('Game screen: room index is out of range');
+		}
+
+		emptyScreen();
+
+		roomIndex = index;
+		loadedObjects = [];
+
+		var roomActive = roomList[roomIndex];
+
+		Array.prototype.push.apply(loadedObjects, roomActive.objects.slice())
+		loadedObjects.push(objectActive);
+
+		loadedObjects.forEach(function (object) {
+			object.bound = roomActive.width;
+			object.sprite.redraw();
+		});
+
+		roomActive.tiles.forEach(function (tile) {
+			background.appendChild(tile);
+		});
+
+		stage.appendChild(objectActive.sprite.element.target);
+	}
+
 	return {
-		load: function (rooms, target) {
+		load: function (rooms, target, spawn) {
 			roomList     = rooms;
 			objectActive = target;
+			spawn        = spawn || 0;
 
-			check(roomList).shouldBeListOf(Room);
-			check(objectActive).shouldBe(GameObject);
+			_check(roomList, 'room list').toBeListOf(Room);
+			_check(objectActive, 'active object').toBe(GameObject);
+			_check(spawn, 'spawn').toBePositiveInt();
 
+			objectActive.scroll = spawn;
 			objectActive.sprite.index = 1;
 
-			roomIndex = 0;
+			changeRoomTo(0);
+		},
+		change: function (index, scroll) {
+			_check(index, 'index').toBePositiveInt();
+			_check(scroll, 'scroll').toBePositiveInt();
 
-			var roomActive = roomList[roomIndex];
+			objectActive.scroll = scroll;
 
-			Array.prototype.push.apply(loadedObjects, roomActive.objects.slice())
-			loadedObjects.push(objectActive);
-
-			loadedObjects.forEach(function (object) {
-				object.bound = roomActive.width;
-				object.sprite.redraw();
-			});
-
-			roomActive.tiles.forEach(function (tile) {
-				background.appendChild(tile);
-			});
-
-			stage.appendChild(objectActive.sprite.element.target);
+			changeRoomTo(index);
 		},
 		next: function () {
 			updateActiveObject();

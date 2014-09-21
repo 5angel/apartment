@@ -1,10 +1,13 @@
 var Room = (function () {
 	var WIDTH_DEFAULT = 320;
+
 	var TYPE_DEFAULT = 'base',
 		SRC_BASE     = 'url(\'dist/i/tiles/',
 		SRC_TAIL     = '.png\')',
 		CLASS_BASE   = 'background__tile';
 
+	var _check = check.bind(null, 'Room');
+	
 	function createTiles(count, type) {
 		var tiles = [];
 
@@ -20,37 +23,22 @@ var Room = (function () {
 		return tiles;
 	}
 
-	function validateRoom(name, type, width, depth) {
-		if (!isValidString(name)) {
-			throw new Error('Room without a name!');
-		}
-
-		if (!isValidString(type)) {
-			throw new Error('Room with invalid type');
-		}
-
-		if (!isInt(width)) {
-			throw new Error('Room with invalid width');
-		}
-
-		if (!isInt(depth)) {
-			throw new Error('Room with invalid depth');
-		}
-	}
-
 	function Room(name, type, width, depth, objects) {
 		this.name  = name;
 		this.type  = type  || TYPE_DEFAULT;
 		this.width = width || WIDTH_DEFAULT;
 		this.depth = depth || 1;
 
-		validateRoom(this.name, this.type, this.width, this.depth);
+		_check(this.name).toBeNonBlankString();
+		_check(this.type).toBeNonBlankString();
+		_check(this.width).toBePositiveInt();
+		_check(this.depth).toBePositiveInt();
 
 		this.width   = Math.max(WIDTH_DEFAULT, this.width);
 		this.tiles   = createTiles(this.depth, this.type);
 		this.objects = objects || [];
 
-		check(this.objects).shouldBeListOf(GameObject);
+		_check(this.objects).toBeListOf(GameObject);
 	}
 
 	Room.prototype.updateTiles = function (offset) {

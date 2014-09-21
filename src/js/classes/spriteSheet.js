@@ -5,27 +5,12 @@ var SpriteSheet = (function () {
 	var CLASS_BASE    = 'stage__sprite',
 	    CLASS_FLIPPED = CLASS_BASE + '_style_flipped';
 
-	function validateOffsets(x, y) {
-		if  (!isInt(x) || !isInt(y)) {
-			throw new Error('Offset values should be integers');
-		}
-	}
-
-	function validateAnimation(name, animation) {
-		if  (!isValidString(name)) {
-			throw new Error('animation without name');
-		}
-
-		check(animation).shouldBe(Animation);
-	}
-	
+	var _check = check.bind(null, 'SpriteSheet');
 
 	function SpriteSheet(name, offsetX, offsetY, presets) {
 		this.name = name;
 
-		if  (!isValidString(this.name)) {
-			throw new Error('sprite sheet without a name');
-		}
+		_check(this.name, 'sprite sheet name').toBeNonBlankString();
 
 		this.offsetX = offsetX || 0;
 		this.offsetY = offsetY || 0;
@@ -44,11 +29,13 @@ var SpriteSheet = (function () {
 		presets = presets || {};
 
 		this.addAnimation = function (name, animation) {
-			validateAnimation(name, animation);
+			_check(name, 'animation name').toBeNonBlankString();
+			_check(animation).toBe(Animation);
 
 			presets[name]   = animation;
 			presets.initial = presets.initial || name;
-			this.animation  = name;
+
+			this.animation = name;
 
 			this.redraw();
 

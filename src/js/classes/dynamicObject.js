@@ -13,17 +13,12 @@ var DynamicObject = (function () {
 		}
 	}
 
-	function DynamicObject(sprite, scroll, hitWidth, vStep, vMax) {
-		var args = Array.prototype.slice.call(arguments);
-
-		// fill disabled value
-		args.splice(3, 0, false);
-
-		DynamicObject.superclass.constructor.apply(this, args);
+	function DynamicObject(name, sprite, scroll, hitWidth, vStep, vMax) {
+		DynamicObject.superclass.constructor.apply(this, [name, sprite, scroll, hitWidth, false]);
 
 		this.velocity = {
 			step: vStep || VELOCITY_STEP_DEFAULT,
-			max:  vMax || VELOCITY_MAX_DEFAULT,
+			max:  vMax  || VELOCITY_MAX_DEFAULT,
 			value: 0
 		};
 
@@ -57,7 +52,7 @@ var DynamicObject = (function () {
 			this.sprite.flip();
 		}
 
-		if (this.scroll < 0 || this.scroll > this.bound) {
+		if ((this.scroll < 0) || (this.scroll > this.bound)) {
 			this.scroll = Math.min(this.bound, Math.max(0, this.scroll));
 			v.value = 0;
 		}
