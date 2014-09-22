@@ -79,32 +79,40 @@
 		}
 	}
 
-	function parseLevelScheme(scheme) {
+	function parseLevel(scheme) {
+		var _check = check.bind(null, 'Parse level');
+
 		var namesUsed = [];
 
 		return scheme.map(function (room, i) {
-			var objects = room.objects.map(function (object, i) {
-				var type   = object.type || OBJECT_TYPE_DEFAULT,
-					name   = object.name || '#' + i.toString(),
-					sprite = SPRITES[object.sprite] || SPRITES.hero;
+			var objects = [];
 
-				check('Parse function', type).toBePresentIn(OBJECT_TYPE_ACCEPTED);
+			if (room.objects) {
+				_check(room.objects).toBeArray();
+			
+				objects = room.objects.map(function (object, i) {
+					var type   = object.type || OBJECT_TYPE_DEFAULT,
+						name   = object.name || '#' + i.toString(),
+						sprite = SPRITES[object.sprite] || SPRITES.hero;
 
-				var parsed = new GameObject(name, sprite.clone(), object.scroll, object.width, object.disabled);
+					check('Parse function', type).toBePresentIn(OBJECT_TYPE_ACCEPTED);
 
-				for (var prop in object.actions) {
-					parsed.addActionListener(prop, parseActionCallback(object.actions[prop]));
-				}
+					var parsed = new GameObject(name, sprite.clone(), object.scroll, object.width, object.disabled);
 
-				return parsed;
-			});
+					for (var prop in object.actions) {
+						parsed.addActionListener(prop, parseActionCallback(object.actions[prop]));
+					}
+
+					return parsed;
+				});
+			}
 
 			return new Room(room.name || ROOM_NAME_DEFAULT, room.type, room.width, room.depth, objects)
 		});
 	}
 
 	var player = new DynamicObject('hero', SPRITES.hero.clone(), 0, 8, false),
-		rooms  = parseLevelScheme(SCHEME);
+		rooms  = parseLevel(SCHEME);
 
 	gameScreen.load(rooms, player, 740);
 

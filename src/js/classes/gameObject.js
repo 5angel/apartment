@@ -53,57 +53,63 @@ var GameObject = (function () {
 			: this.hitWidth;
 	};
 
-	GameObject.prototype.getDeltaWidth = function (k) {
-		k = k || 1;
-
-		return (STAGE_WIDTH / k) - Math.ceil(this.sprite.getFrameWidth() / k);
+	GameObject.prototype.getDeltaWidth = function () {
+		return (STAGE_WIDTH / 2) - Math.ceil(this.sprite.getFrameWidth() / 2);
 	};
 
-	GameObject.prototype.getDeltaHeight = function (k) {
-		k = k || 1;
-
-		return (STAGE_HEIGHT / k) - Math.ceil(this.sprite.getFrameHeight() / k) - FLOOR_OFFSET;
+	GameObject.prototype.getDeltaHeight = function () {
+		return (STAGE_HEIGHT / 2) - Math.ceil(this.sprite.getFrameHeight() / 2);
 	};
 
 	GameObject.prototype.leftCornerReached = function () {
-	  return this.scroll < this.getDeltaWidth(2);
+	  return this.scroll < STAGE_WIDTH / 2;
 	};
 
 	GameObject.prototype.rightCornerReached = function (length) {
-		return this.scroll + this.getDeltaWidth(2) >= length;
+		return this.scroll > length - STAGE_WIDTH / 2;
 	};
 
-	GameObject.prototype.correctSprite = function (length, relative) {
-		if (relative !== null && !(relative instanceof GameObject))	{
-			throw new Error('invalid relative object');
+	GameObject.prototype.correctPosition = function (length, relative) {
+		if (relative) {
+			_check(relative).toBe(GameObject);
 		}
 
-		this.sprite.y = this.getDeltaHeight();
+		var bounded = false;
 
-		var rightmost = Math.floor(this.scroll + this.getDeltaWidth() - length),
-			leftmost  = Math.floor(this.scroll);
+		var offset = this.getHitWidth();
 
-		if (relative) { // object provided, position sprite relative to it
+		if ((this.scroll < offset + 1) || (this.scroll > this.bound - offset)) {
+			bounded = true;
+
+			this.scroll = Math.min(this.bound - offset, Math.max(offset + 1, this.scroll));
+		}
+
+		this.sprite.y = STAGE_HEIGHT - this.sprite.getFrameHeight() - FLOOR_OFFSET;
+
+		var rightmost = Math.floor(this.scroll) - length + STAGE_WIDTH - Math.ceil(this.sprite.getFrameWidth() / 2),
+			leftmost  = Math.floor(this.scroll) - Math.ceil(this.sprite.getFrameWidth() / 2);
+
+		if (relative) {
 			if (!relative.leftCornerReached() && !relative.rightCornerReached(length)) {
-				this.sprite.x = this.getDeltaWidth(2) - Math.floor(relative.scroll - this.scroll);
+				this.sprite.x = this.getDeltaWidth() - Math.floor(relative.scroll - this.scroll);
 			} else {
-				this.sprite.x = relative.rightCornerReached(length) ? rightmost + 1 : leftmost - 1; // correct missing pixel
+				this.sprite.x = relative.rightCornerReached(length) ? rightmost : leftmost; // correct missing pixel
 			}
-		} else { // no object provided, position sprite relative to bounds
+		} else {
 			if (!this.leftCornerReached() && !this.rightCornerReached(length)) {
-				this.sprite.x = this.getDeltaWidth(2); // center sprite
+				this.sprite.x = this.getDeltaWidth(); // center sprite
 			} else {
 				this.sprite.x = this.rightCornerReached(length) ? rightmost : leftmost;
 			}
 		}
 
 		this.sprite.update();
+
+		return bounded;
 	};
 
 	GameObject.prototype.createAction = function (name, target) {
-		if (!isValidString(name)) {
-			throw new Error('action to have a name');
-		}
+		_check(name, 'name').toBeNonBlankString();
 
 		return new Action(name, this, target);
 	};

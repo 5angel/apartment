@@ -97,6 +97,12 @@ var Checker = (function () {
 		}
 	};
 
+	Checker.prototype.toBeArray = function () {
+		if (!isArray(this.target)) {
+			throw new Error(this.source + ': "' + this.name + '" ' + ERROR_ARRAY);
+		}
+	};
+
 	Checker.prototype.toBePresentIn = function (list) {
 		if (!isArray(list)) {
 			throw new Error('Checker: "list" ' + ERROR_ARRAY);

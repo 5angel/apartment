@@ -27,6 +27,14 @@ var DynamicObject = (function () {
 
 	inherits(DynamicObject, GameObject);
 
+	DynamicObject.prototype.correctPosition = function () {
+		var bounded = DynamicObject.superclass.correctPosition.apply(this, arguments);
+
+		if (bounded) {
+			this.velocity.value = 0;
+		}
+	};
+
 	DynamicObject.prototype.pull = function (k, value) {
 		k = k || 1;
 		value = value || this.velocity.step;
@@ -50,11 +58,6 @@ var DynamicObject = (function () {
 
 		if ((k < 0 && flipped) || (k > 0 && !flipped)) {
 			this.sprite.flip();
-		}
-
-		if ((this.scroll < 0) || (this.scroll > this.bound)) {
-			this.scroll = Math.min(this.bound, Math.max(0, this.scroll));
-			v.value = 0;
 		}
 
 		this.correctAnimation();

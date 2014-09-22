@@ -128,7 +128,7 @@ var gameScreen = (function () {
 			var children = Array.prototype.slice.call(stage.childNodes, 0);
 
 			loadedObjects.forEach(function (object, i) {
-				object.correctSprite(roomActive.width, object === objectActive ? null : objectActive);
+				object.correctPosition(roomActive.width, object === objectActive ? null : objectActive);
 				object.sprite.step();
 				object.sprite.update();
 
@@ -149,17 +149,15 @@ var gameScreen = (function () {
 				}
 			});
 
-			var delta = Math.floor(objectActive.getDeltaWidth(2));
+			var offset = objectActive.scroll;
 
-			var x = 0;
-
-			if (objectActive.scroll + delta >= roomActive.width) {
-				x = roomActive.width - (delta * 2);
-			} else if (objectActive.scroll >= delta) {
-				x = Math.floor(objectActive.scroll) - delta;
+			if (objectActive.leftCornerReached()) {
+				offset = 0;
+			} else if (objectActive.rightCornerReached(roomActive.width)) {
+				offset = roomActive.width;
 			}
 
-			roomActive.updateTiles(x);
+			roomActive.updateTiles(Math.floor(offset));
 		},
 		getContainer: function () {
 			return container;

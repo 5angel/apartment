@@ -346,57 +346,63 @@ var GameObject = (function () {
 			: this.hitWidth;
 	};
 
-	GameObject.prototype.getDeltaWidth = function (k) {
-		k = k || 1;
-
-		return (STAGE_WIDTH / k) - Math.ceil(this.sprite.getFrameWidth() / k);
+	GameObject.prototype.getDeltaWidth = function () {
+		return (STAGE_WIDTH / 2) - Math.ceil(this.sprite.getFrameWidth() / 2);
 	};
 
-	GameObject.prototype.getDeltaHeight = function (k) {
-		k = k || 1;
-
-		return (STAGE_HEIGHT / k) - Math.ceil(this.sprite.getFrameHeight() / k) - FLOOR_OFFSET;
+	GameObject.prototype.getDeltaHeight = function () {
+		return (STAGE_HEIGHT / 2) - Math.ceil(this.sprite.getFrameHeight() / 2);
 	};
 
 	GameObject.prototype.leftCornerReached = function () {
-	  return this.scroll < this.getDeltaWidth(2);
+	  return this.scroll < STAGE_WIDTH / 2;
 	};
 
 	GameObject.prototype.rightCornerReached = function (length) {
-		return this.scroll + this.getDeltaWidth(2) >= length;
+		return this.scroll > length - STAGE_WIDTH / 2;
 	};
 
-	GameObject.prototype.correctSprite = function (length, relative) {
-		if (relative !== null && !(relative instanceof GameObject))	{
-			throw new Error('invalid relative object');
+	GameObject.prototype.correctPosition = function (length, relative) {
+		if (relative) {
+			_check(relative).toBe(GameObject);
 		}
 
-		this.sprite.y = this.getDeltaHeight();
+		var bounded = false;
 
-		var rightmost = Math.floor(this.scroll + this.getDeltaWidth() - length),
-			leftmost  = Math.floor(this.scroll);
+		var offset = this.getHitWidth();
 
-		if (relative) { // object provided, position sprite relative to it
+		if ((this.scroll < offset + 1) || (this.scroll > this.bound - offset)) {
+			bounded = true;
+
+			this.scroll = Math.min(this.bound - offset, Math.max(offset + 1, this.scroll));
+		}
+
+		this.sprite.y = STAGE_HEIGHT - this.sprite.getFrameHeight() - FLOOR_OFFSET;
+
+		var rightmost = Math.floor(this.scroll) - length + STAGE_WIDTH - Math.ceil(this.sprite.getFrameWidth() / 2),
+			leftmost  = Math.floor(this.scroll) - Math.ceil(this.sprite.getFrameWidth() / 2);
+
+		if (relative) {
 			if (!relative.leftCornerReached() && !relative.rightCornerReached(length)) {
-				this.sprite.x = this.getDeltaWidth(2) - Math.floor(relative.scroll - this.scroll);
+				this.sprite.x = this.getDeltaWidth() - Math.floor(relative.scroll - this.scroll);
 			} else {
-				this.sprite.x = relative.rightCornerReached(length) ? rightmost + 1 : leftmost - 1; // correct missing pixel
+				this.sprite.x = relative.rightCornerReached(length) ? rightmost : leftmost; // correct missing pixel
 			}
-		} else { // no object provided, position sprite relative to bounds
+		} else {
 			if (!this.leftCornerReached() && !this.rightCornerReached(length)) {
-				this.sprite.x = this.getDeltaWidth(2); // center sprite
+				this.sprite.x = this.getDeltaWidth(); // center sprite
 			} else {
 				this.sprite.x = this.rightCornerReached(length) ? rightmost : leftmost;
 			}
 		}
 
 		this.sprite.update();
+
+		return bounded;
 	};
 
 	GameObject.prototype.createAction = function (name, target) {
-		if (!isValidString(name)) {
-			throw new Error('action to have a name');
-		}
+		_check(name, 'name').toBeNonBlankString();
 
 		return new Action(name, this, target);
 	};
@@ -432,6 +438,14 @@ var DynamicObject = (function () {
 
 	inherits(DynamicObject, GameObject);
 
+	DynamicObject.prototype.correctPosition = function () {
+		var bounded = DynamicObject.superclass.correctPosition.apply(this, arguments);
+
+		if (bounded) {
+			this.velocity.value = 0;
+		}
+	};
+
 	DynamicObject.prototype.pull = function (k, value) {
 		k = k || 1;
 		value = value || this.velocity.step;
@@ -455,11 +469,6 @@ var DynamicObject = (function () {
 
 		if ((k < 0 && flipped) || (k > 0 && !flipped)) {
 			this.sprite.flip();
-		}
-
-		if ((this.scroll < 0) || (this.scroll > this.bound)) {
-			this.scroll = Math.min(this.bound, Math.max(0, this.scroll));
-			v.value = 0;
 		}
 
 		this.correctAnimation();
@@ -648,6 +657,12 @@ var Checker = (function () {
 	Checker.prototype.toBeFunction = function () {
 		if (!isFunction(this.target)) {
 			throw new Error(this.source + ': "' + this.name + '" ' + ERROR_FUNCTION);
+		}
+	};
+
+	Checker.prototype.toBeArray = function () {
+		if (!isArray(this.target)) {
+			throw new Error(this.source + ': "' + this.name + '" ' + ERROR_ARRAY);
 		}
 	};
 
@@ -842,7 +857,7 @@ var gameScreen = (function () {
 			var children = Array.prototype.slice.call(stage.childNodes, 0);
 
 			loadedObjects.forEach(function (object, i) {
-				object.correctSprite(roomActive.width, object === objectActive ? null : objectActive);
+				object.correctPosition(roomActive.width, object === objectActive ? null : objectActive);
 				object.sprite.step();
 				object.sprite.update();
 
@@ -863,17 +878,15 @@ var gameScreen = (function () {
 				}
 			});
 
-			var delta = Math.floor(objectActive.getDeltaWidth(2));
+			var offset = objectActive.scroll;
 
-			var x = 0;
-
-			if (objectActive.scroll + delta >= roomActive.width) {
-				x = roomActive.width - (delta * 2);
-			} else if (objectActive.scroll >= delta) {
-				x = Math.floor(objectActive.scroll) - delta;
+			if (objectActive.leftCornerReached()) {
+				offset = 0;
+			} else if (objectActive.rightCornerReached(roomActive.width)) {
+				offset = roomActive.width;
 			}
 
-			roomActive.updateTiles(x);
+			roomActive.updateTiles(Math.floor(offset));
 		},
 		getContainer: function () {
 			return container;
@@ -961,32 +974,40 @@ var gameScreen = (function () {
 		}
 	}
 
-	function parseLevelScheme(scheme) {
+	function parseLevel(scheme) {
+		var _check = check.bind(null, 'Parse level');
+
 		var namesUsed = [];
 
 		return scheme.map(function (room, i) {
-			var objects = room.objects.map(function (object, i) {
-				var type   = object.type || OBJECT_TYPE_DEFAULT,
-					name   = object.name || '#' + i.toString(),
-					sprite = SPRITES[object.sprite] || SPRITES.hero;
+			var objects = [];
 
-				check('Parse function', type).toBePresentIn(OBJECT_TYPE_ACCEPTED);
+			if (room.objects) {
+				_check(room.objects).toBeArray();
+			
+				objects = room.objects.map(function (object, i) {
+					var type   = object.type || OBJECT_TYPE_DEFAULT,
+						name   = object.name || '#' + i.toString(),
+						sprite = SPRITES[object.sprite] || SPRITES.hero;
 
-				var parsed = new GameObject(name, sprite.clone(), object.scroll, object.width, object.disabled);
+					check('Parse function', type).toBePresentIn(OBJECT_TYPE_ACCEPTED);
 
-				for (var prop in object.actions) {
-					parsed.addActionListener(prop, parseActionCallback(object.actions[prop]));
-				}
+					var parsed = new GameObject(name, sprite.clone(), object.scroll, object.width, object.disabled);
 
-				return parsed;
-			});
+					for (var prop in object.actions) {
+						parsed.addActionListener(prop, parseActionCallback(object.actions[prop]));
+					}
+
+					return parsed;
+				});
+			}
 
 			return new Room(room.name || ROOM_NAME_DEFAULT, room.type, room.width, room.depth, objects)
 		});
 	}
 
 	var player = new DynamicObject('hero', SPRITES.hero.clone(), 0, 8, false),
-		rooms  = parseLevelScheme(SCHEME);
+		rooms  = parseLevel(SCHEME);
 
 	gameScreen.load(rooms, player, 740);
 
