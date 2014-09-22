@@ -98,10 +98,10 @@ var gameScreen = (function () {
 	}
 
 	return {
-		load: function (rooms, target, spawn) {
+		load: function (rooms, spawn, target) {
 			roomList     = rooms;
 			objectActive = target;
-			spawn        = spawn || 0;
+			spawn        = spawn;
 
 			_check(roomList, 'room list').toBeListOf(Room);
 			_check(objectActive, 'active object').toBe(GameObject);

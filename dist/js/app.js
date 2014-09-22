@@ -827,10 +827,10 @@ var gameScreen = (function () {
 	}
 
 	return {
-		load: function (rooms, target, spawn) {
+		load: function (rooms, spawn, target) {
 			roomList     = rooms;
 			objectActive = target;
-			spawn        = spawn || 0;
+			spawn        = spawn;
 
 			_check(roomList, 'room list').toBeListOf(Room);
 			_check(objectActive, 'active object').toBe(GameObject);
@@ -913,42 +913,53 @@ var gameScreen = (function () {
 	SPRITES.door = new SpriteSheet('door', 0, -10)
 		.addAnimation('idle', new Animation({ width: 40, height: 80 }));
 
-	var SCHEME = [
-		{
-			width: 840,
-			objects: [
-				{
-					sprite: 'door',
-					scroll: 40,
-					disabled: true
-				},
-				{
-					sprite: 'door',
-					scroll: 400,
-					actions: {
-						interact: {
-							type: 'level',
-							index: 1
+	var SCHEME = {
+		spawn: 600,
+		rooms: [
+			{
+				width: 840,
+				objects: [
+					{
+						sprite: 'door',
+						scroll: 40,
+						disabled: true
+					},
+					{
+						sprite: 'door',
+						scroll: 400,
+						actions: {
+							interact: {
+								type: 'level',
+								index: 1,
+								scroll: 160
+							}
+						}
+					},
+					{
+						sprite: 'door',
+						scroll: 780,
+						disabled: true
+					}
+				]
+			},
+			{
+				width: 320,
+				objects: [
+					{
+						sprite: 'door',
+						scroll: 160,
+						actions: {
+							interact: {
+								type: 'level',
+								index: 0,
+								scroll: 400
+							}
 						}
 					}
-				},
-				{
-					sprite: 'door',
-					scroll: 780,
-					disabled: true
-				}
-			]
-		},
-		{
-			width: 320,
-			objects: [
-				{
-					sprite: 'door',
-					scroll: 160
-				}
-			]
-		}
-	];
+				]
+			}
+		]
+	};
 
 	document.body.appendChild(gameScreen.getContainer());
 
@@ -967,8 +978,6 @@ var gameScreen = (function () {
 					_check(scroll, 'scroll').toBePositiveInt();
 
 					gameScreen.change(index, scroll);
-					
-					console.log('It works!', scheme, action);
 				};
 				break;
 		}
@@ -977,9 +986,14 @@ var gameScreen = (function () {
 	function parseLevel(scheme) {
 		var _check = check.bind(null, 'Parse level');
 
-		var namesUsed = [];
+		var product = {};
 
-		return scheme.map(function (room, i) {
+		_check(scheme.spawn, 'spawn').toBePositiveInt();
+		_check(scheme.rooms, 'rooms').toBeArray();
+
+		product.spawn = scheme.spawn;
+
+		product.rooms = scheme.rooms.map(function (room, i) {
 			var objects = [];
 
 			if (room.objects) {
@@ -1004,12 +1018,14 @@ var gameScreen = (function () {
 
 			return new Room(room.name || ROOM_NAME_DEFAULT, room.type, room.width, room.depth, objects)
 		});
+
+		return product;
 	}
 
 	var player = new DynamicObject('hero', SPRITES.hero.clone(), 0, 8, false),
-		rooms  = parseLevel(SCHEME);
+		level  = parseLevel(SCHEME);
 
-	gameScreen.load(rooms, player, 740);
+	gameScreen.load(level.rooms, level.spawn, player);
 
 	setInterval(gameScreen.next, FRAME_STEP);
 })();
