@@ -36,7 +36,7 @@
 							interact: {
 								type: 'level',
 								index: 1,
-								scroll: 160
+								scroll: 240
 							}
 						}
 					},
@@ -49,10 +49,11 @@
 			},
 			{
 				width: 320,
+				type: 'red',
 				objects: [
 					{
 						sprite: 'door',
-						scroll: 160,
+						scroll: 240,
 						actions: {
 							interact: {
 								type: 'level',
