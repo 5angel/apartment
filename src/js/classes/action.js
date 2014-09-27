@@ -1,5 +1,4 @@
 var Action = (function () {
-
 	var _check = check.bind(null, 'Action')
 
 	function Action(name, source, target, data) {
@@ -8,9 +7,9 @@ var Action = (function () {
 		this.target = target;
 		this.data   = data || null;
 
-		_check(name).toBeNonBlankString();
-		_check(source).toBe(GameObject);
-		_check(target).toBe(GameObject);
+		_check(this.name).toBeNonBlankString();
+		_check(this.source).toBe(GameObject);
+		_check(this.target).toBe(GameObject);
 	}
 
 	return Action;

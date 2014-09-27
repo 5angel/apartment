@@ -1,3 +1,7 @@
+function isDefined(object) {
+	return object !== undefined;
+}
+
 function isBoolean(value) {
 	return value === false || value === true;
 }
@@ -22,12 +26,44 @@ function isFunction(func) {
 	return func && new Object().toString.call(func) === '[object Function]';
 }
 
+function parseBoolean(str) {
+	if (str === 'true') {
+		return true;
+	} else if (str === 'false') {
+		return false;
+	}
+
+	return null;
+}
+
+function toCapital(str) {
+	if (!isValidString(str)) {
+		return str;
+	}
+
+	return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function toCamelCase(str) {
+	if (!isValidString(str) || str.indexOf('-') === -1) {
+		return str;
+	}
+
+	var parts = str.split('-');
+
+	return parts[0] + parts.slice(1).map(toCapital).join('');
+}
+
+function toArray(object) {
+	return Array.prototype.slice.call(object);
+}
+
 function contains(array) {
-  if (arguments.length < 2) {
-	throw new Error('nothing to search for');
+  if (!isArray(array) || arguments.length < 2) {
+	return false;
   }
  
-  var items = Array.prototype.slice.call(arguments).slice(1);
+  var items = toArray(arguments).slice(1);
  
   return items.every(function (item) {
 	return array.indexOf(item) !== -1;
@@ -275,7 +311,6 @@ var SpriteSheet = (function () {
 	return SpriteSheet;
 })();
 var Action = (function () {
-
 	var _check = check.bind(null, 'Action')
 
 	function Action(name, source, target, data) {
@@ -284,9 +319,9 @@ var Action = (function () {
 		this.target = target;
 		this.data   = data || null;
 
-		_check(name).toBeNonBlankString();
-		_check(source).toBe(GameObject);
-		_check(target).toBe(GameObject);
+		_check(this.name).toBeNonBlankString();
+		_check(this.source).toBe(GameObject);
+		_check(this.target).toBe(GameObject);
 	}
 
 	return Action;
@@ -893,138 +928,148 @@ var gameScreen = (function () {
 		}
 	};
 })();
-(function () {
-	var FRAME_STEP = 80;
+var XML_CONFIG = '\
+<level spawn="600">\
+	<room name="hall" width="840">\
+		<object sprite="door" scroll="40" disabled="true">\
+		</object>\
+		<object sprite="door" scroll="400">\
+			<action name="interact" type="level" index="1" scroll="240">\
+			</action>\
+		</object>\
+		<object sprite="door" scroll="780" disabled="true">\
+		</object>\
+	</room>\
+	<room width="320" type="red">\
+		<object sprite="door" scroll="240">\
+			<action name="interact" type="level" index="0" scroll="400">\
+			</action>\
+		</object>\
+	</room>\
+</level>\
+';
+var SPRITES = {};
 
-	var OBJECT_TYPE_ACCEPTED = [GameObject, DynamicObject],
-	    OBJECT_TYPE_DEFAULT  = OBJECT_TYPE_ACCEPTED[0];
+SPRITES.hero = new SpriteSheet('hero')
+	.addAnimation('idle', new Animation({ width: 37, height: 72 }))
+	.addAnimation('walk', new Animation({ x: 37, width: 37, height: 72, length: 16 }));
 
-	var ACTION_TYPE_ACCEPTED = ['level'];
+SPRITES.door = new SpriteSheet('door', 0, -10)
+	.addAnimation('idle', new Animation({ width: 40, height: 80 }));
+var XMLHelper = (function () {
+	var ACTION_NAMES_ACCEPTED = ['interact'],
+		ACTION_NAME_DEFAULT   = ACTION_NAMES_ACCEPTED[0],
+		ACTION_TYPES_ACCEPTED = ['level'];
 
-	var ROOM_NAME_DEFAULT = 'blank';
+	var _check = check.bind(null, 'XML Helper');
 
-	// define sprites
-	var SPRITES = {};
+	function parseAttributes(dom) {
+		return toArray(dom.attributes).reduce(function (object, node) {
+			object[toCamelCase(node.name)] = node.value;
 
-	SPRITES.hero = new SpriteSheet('hero')
-		.addAnimation('idle', new Animation({ width: 37, height: 72 }))
-		.addAnimation('walk', new Animation({ x: 37, width: 37, height: 72, length: 16 }));
+			return object;
+		}, {});
+	}
 
-	SPRITES.door = new SpriteSheet('door', 0, -10)
-		.addAnimation('idle', new Animation({ width: 40, height: 80 }));
+	function parseAction(dom) {
+		var attrs = parseAttributes(dom);
 
-	var SCHEME = {
-		spawn: 600,
-		rooms: [
-			{
-				width: 840,
-				objects: [
-					{
-						sprite: 'door',
-						scroll: 40,
-						disabled: true
-					},
-					{
-						sprite: 'door',
-						scroll: 400,
-						actions: {
-							interact: {
-								type: 'level',
-								index: 1,
-								scroll: 240
-							}
-						}
-					},
-					{
-						sprite: 'door',
-						scroll: 780,
-						disabled: true
-					}
-				]
-			},
-			{
-				width: 320,
-				type: 'red',
-				objects: [
-					{
-						sprite: 'door',
-						scroll: 240,
-						actions: {
-							interact: {
-								type: 'level',
-								index: 0,
-								scroll: 400
-							}
-						}
-					}
-				]
-			}
-		]
-	};
+		var type = attrs.type;
 
-	document.body.appendChild(gameScreen.getContainer());
+		_check(type, 'type').toBePresentIn(ACTION_TYPES_ACCEPTED);
 
-	function parseActionCallback(scheme) {
-		var _check = check.bind(null, 'Parse action callback');
-	
-		_check(scheme.type, 'type').toBePresentIn(ACTION_TYPE_ACCEPTED);
-
-		switch (scheme.type) {
+		switch (type) {
 			case 'level':
-				return function (action) {
-					var index  = scheme.index  || 0,
-						scroll = scheme.scroll || 0;
+				var index  = isDefined(attrs.index)  ? parseFloat(attrs.index)  : 0,
+					scroll = isDefined(attrs.scroll) ? parseFloat(attrs.scroll) : 0;
 				
-					_check(index, 'index').toBePositiveInt();
-					_check(scroll, 'scroll').toBePositiveInt();
+				_check(index, 'index').toBePositiveInt();
+				_check(scroll, 'scroll').toBePositiveInt();
 
+				return function (action) {
 					gameScreen.change(index, scroll);
 				};
-				break;
 		}
 	}
 
-	function parseLevel(scheme) {
-		var _check = check.bind(null, 'Parse level');
+	function parseObject(dom, index) {
+		var attrs = parseAttributes(dom);
 
-		var product = {};
+		var name     = attrs.name || '#' + index.toString(),
+			sprite   = attrs.sprite,
+			scroll   = isDefined(attrs.scroll) ? parseFloat(attrs.scroll) : null,
+			hitWidth = attrs.hitWidth || null,
+			disabled = isDefined(attrs.disabled) ? parseBoolean(attrs.disabled) : null;
 
-		_check(scheme.spawn, 'spawn').toBePositiveInt();
-		_check(scheme.rooms, 'rooms').toBeArray();
+		_check(sprite, 'sprite').toBeNonBlankString();
 
-		product.spawn = scheme.spawn;
+		var sheet = SPRITES[sprite];
 
-		product.rooms = scheme.rooms.map(function (room, i) {
-			var objects = [];
+		var object = new GameObject(name, sheet.clone(), scroll, hitWidth, disabled);
 
-			if (room.objects) {
-				_check(room.objects).toBeArray();
-			
-				objects = room.objects.map(function (object, i) {
-					var type   = object.type || OBJECT_TYPE_DEFAULT,
-						name   = object.name || '#' + i.toString(),
-						sprite = SPRITES[object.sprite] || SPRITES.hero;
+		toArray(dom.childNodes).forEach(function (node) {
+			var name = node.attributes.name.value || ACTION_NAME_DEFAULT;
 
-					check('Parse function', type).toBePresentIn(OBJECT_TYPE_ACCEPTED);
-
-					var parsed = new GameObject(name, sprite.clone(), object.scroll, object.width, object.disabled);
-
-					for (var prop in object.actions) {
-						parsed.addActionListener(prop, parseActionCallback(object.actions[prop]));
-					}
-
-					return parsed;
-				});
-			}
-
-			return new Room(room.name || ROOM_NAME_DEFAULT, room.type, room.width, room.depth, objects)
+			_check(name, 'name').toBePresentIn(ACTION_NAMES_ACCEPTED);
+		
+			object.addActionListener(name, parseAction(node));
 		});
 
-		return product;
+		return object;
 	}
 
+	function parseRoom(dom, index) {
+		var attrs = parseAttributes(dom);
+
+		var name  = attrs.name || '#' + index.toString(),
+			type  = attrs.type || null,
+			width = isDefined(attrs.width) ? parseFloat(attrs.width) : 0,
+			depth = isDefined(attrs.depth) ? parseFloat(attrs.depth) : 0;
+
+		var objects = toArray(dom.childNodes).map(parseObject);
+
+		return new Room(name, type, width, depth, objects);
+	}
+
+	function parseLevel(dom) {
+		var level = new Object();
+
+		if (dom.attributes.spawn) {
+			level.spawn = parseFloat(dom.attributes.spawn.value);
+			_check(level.spawn, 'spawn').toBePositiveInt();
+		}
+
+		level.rooms = toArray(dom.childNodes).map(parseRoom);
+
+		return level;
+	}
+
+	return {
+		parse: function (str) {
+			var dom;
+
+			str = str.replace(/\t+/g,''); // clear tabulations
+
+			if (window.DOMParser) {
+				var parser = new DOMParser();
+				dom = parser.parseFromString(str, 'text/xml');
+			} else { // Internet Explorer
+				dom = new ActiveXObject('Microsoft.XMLDOM');
+				dom.async = false;
+				dom.loadXML(str); 
+			}
+
+			return parseLevel(dom.getElementsByTagName('level')[0]);
+		}
+	};
+})();
+(function () {
+	var FRAME_STEP = 80;
+
+	document.body.appendChild(gameScreen.getContainer());
+
 	var player = new DynamicObject('hero', SPRITES.hero.clone(), 0, 8, false),
-		level  = parseLevel(SCHEME);
+		level  = XMLHelper.parse(XML_CONFIG);
 
 	gameScreen.load(level.rooms, level.spawn, player);
 
