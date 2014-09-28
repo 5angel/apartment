@@ -9,22 +9,42 @@ var GameObject = (function () {
 		_check(name, 'action listener name').toBeNonBlankString();
 		_check(callback, 'action callback').toBeFunction();
 
-		if (listeneres[name] !== undefined) {
-			console.warn('a receiver with name "' + name + '" already exists, overwriting');
-		}
+		var source = listeneres[name];
 
-		listeneres[name] = callback;
+		source !== undefined
+			? source.push(callback)
+			: source = [callback];
+
+		listeneres[name] = source;
 	}
 
 	function receiveAction(listeneres, action) {
+		var source = listeneres[action.name];
+
+		function wrapCallback(index) {
+			var callback = source[index];
+
+			return function () {
+				if (index < source.length) {
+					callback(action, wrapCallback(index + 1))
+				}
+			};
+		}
+
 		if (!this.disabled) {
 			_check(action).toBe(Action);
 
-			var callback = listeneres[action.name];
+			var callback = source[0];
 
-			callback
-				? callback(action)
-				: console.warn('Couldn\'t find an action listener for "' + action.name + '"');
+			if (source !== undefined) {
+				if (source.length > 1) {
+					callback(action, wrapCallback(1));
+				} else {
+					callback(action);
+				}
+			} else {
+				console.warn('Couldn\'t find an action listener for "' + action.name + '"');
+			}
 		}
 	}
 

@@ -1,7 +1,7 @@
 var XMLHelper = (function () {
 	var ACTION_NAMES_ACCEPTED = ['interact'],
 		ACTION_NAME_DEFAULT   = ACTION_NAMES_ACCEPTED[0],
-		ACTION_TYPES_ACCEPTED = ['level'];
+		ACTION_TYPES_ACCEPTED = ['level', 'prompt'];
 
 	var _check = check.bind(null, 'XML Helper');
 
@@ -28,9 +28,21 @@ var XMLHelper = (function () {
 				_check(index, 'index').toBePositiveInt();
 				_check(scroll, 'scroll').toBePositiveInt();
 
-				return function (action) {
+				return function (action, callback) {
 					gameScreen.change(index, scroll);
+
+					if (callback) {
+						_check(callback, 'callback').toBeFunction();
+					
+						callback();
+					}
 				};
+			case 'prompt':
+				return function (action, callback) {
+					var text = 'derp';
+				
+					gameScreen.prompt(text, callback);
+				}
 		}
 	}
 

@@ -3,7 +3,7 @@ var PromptObject = (function () {
 
 	function PromptObject(text) {
 		this.text    = text;
-		this.element = new RichHTMLElement(document.createElement('div'));
+		this.element = new RichHTMLElement('div');
 
 		_check(this.text).toBeNonBlankString();
 	}

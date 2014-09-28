@@ -90,40 +90,94 @@ function copy(source, target) {
 	return target;
 }
 var RichHTMLElement = (function () {
-  function RichHTMLElement(element) {
-    this.target = element;
-  }
+	var _check = check.bind(null, 'RichHTMLElement');
 
-  RichHTMLElement.prototype.getClasses = function () {
-    return this.target.className.split(/\s+/);
-  };
-
-  RichHTMLElement.prototype.hasClass = function (name) {
-	return this.getClasses().indexOf(name) !== -1;
-  };
-
-  RichHTMLElement.prototype.addClass = function (name) {
-	if (!this.hasClass(name)) {
-	  var classes = this.getClasses();
-
-	  classes.push(name);
-
-	  this.target.className = classes.join(' ');
+	function isRich(element) {
+		return _check(element).is(RichHTMLElement);
 	}
-  };
 
-  RichHTMLElement.prototype.removeClass = function (name) {
-	if (this.hasClass(name)) {
-	  var classes = this.getClasses(),
-	      index   = classes.indexOf(name);
-
-	  classes.splice(index, 1);
-
-	  this.target.className = classes.join(' ');
+	function toRich(element) {
+		return new RichHTMLElement(element);
 	}
-  };
 
-  return RichHTMLElement;
+	function toHTML(element) {
+		return isRich(element) ? element.source : element;
+	}
+
+	function RichHTMLElement(element) {
+		if (isValidString(element)) {
+			element = document.createElement(element);
+		}
+
+		_check(element, 'element').toBe(HTMLElement);
+
+		this.source = element;
+	}
+
+	RichHTMLElement.prototype.attr = function (name, value) {
+		this.source.setAttribute(name, value);
+
+		return this;
+	};
+
+	RichHTMLElement.prototype.append = function (element) {
+		this.source.appendChild(toHTML(element));
+
+		return this;
+	};
+
+	RichHTMLElement.prototype.prepend = function (element) {
+		var first  = this.source.firstChild;
+
+		first ? this.source.insertBefore(toHTML(element), first) : this.append(element);
+
+		return this;
+	};
+
+	RichHTMLElement.prototype.remove = function (element) {
+		this.source.removeChild(isRich(element) ? element.source : element);
+
+		return this;
+	};
+
+	RichHTMLElement.prototype.children = function () {
+		return Array.prototype.slice.call(this.source.childNodes, 0).map(toRich);
+	};
+ 
+	RichHTMLElement.prototype.getClasses = function () {
+		return this.source.className.split(/\s+/);
+	};
+
+	RichHTMLElement.prototype.hasClass = function (name) {
+		return this.getClasses().indexOf(name) !== -1;
+	};
+
+	RichHTMLElement.prototype.addClass = function (name) {
+		if (!this.hasClass(name)) {
+			var classes = this.getClasses();
+
+			classes.push(name);
+
+			this.source.className = classes.join(' ');
+		}
+
+		return this;
+	};
+
+	RichHTMLElement.prototype.removeClass = function (name) {
+		if (this.hasClass(name)) {
+			var classes = this.getClasses(),
+				index   = classes.indexOf(name);
+
+			classes.splice(index, 1);
+
+			this.source.className = classes.join(' ');
+		}
+
+		return this;
+	};
+
+	return RichHTMLElement;
 })();
 
 var Animation = (function () {
@@ -225,7 +279,7 @@ var SpriteSheet = (function () {
 		this.flipped   = false;
 		this.animation = presets ? presets.initial : null;
 
-		this.element.target.style.backgroundImage = SRC_BASE + name + SRC_TAIL;
+		this.element.source.style.backgroundImage = SRC_BASE + name + SRC_TAIL;
 		this.element.addClass(CLASS_BASE);
 
 		presets = presets || {};
@@ -271,7 +325,7 @@ var SpriteSheet = (function () {
 		var fx = (current.x + (current.frame * current.width)) * 2,
 		    fy = current.y;
 
-	    var style = this.element.target.style;	
+	    var style = this.element.source.style;	
 		
 		style.left = Math.floor((this.x * 2) + (this.offsetX * 2)).toString() + 'px';
 		style.top  = Math.floor((this.y * 2) + (this.offsetY * 2)).toString() + 'px';
@@ -279,7 +333,7 @@ var SpriteSheet = (function () {
 	};
 
 	SpriteSheet.prototype.redraw = function () {
-	    var style   = this.element.target.style,
+	    var style   = this.element.source.style,
 		    current = this.getAnimation();
 
 		current.frame = 0;
@@ -337,22 +391,42 @@ var GameObject = (function () {
 		_check(name, 'action listener name').toBeNonBlankString();
 		_check(callback, 'action callback').toBeFunction();
 
-		if (listeneres[name] !== undefined) {
-			console.warn('a receiver with name "' + name + '" already exists, overwriting');
-		}
+		var source = listeneres[name];
 
-		listeneres[name] = callback;
+		source !== undefined
+			? source.push(callback)
+			: source = [callback];
+
+		listeneres[name] = source;
 	}
 
 	function receiveAction(listeneres, action) {
+		var source = listeneres[action.name];
+
+		function wrapCallback(index) {
+			var callback = source[index];
+
+			return function () {
+				if (index < source.length) {
+					callback(action, wrapCallback(index + 1))
+				}
+			};
+		}
+
 		if (!this.disabled) {
 			_check(action).toBe(Action);
 
-			var callback = listeneres[action.name];
+			var callback = source[0];
 
-			callback
-				? callback(action)
-				: console.warn('Couldn\'t find an action listener for "' + action.name + '"');
+			if (source !== undefined) {
+				if (source.length > 1) {
+					callback(action, wrapCallback(1));
+				} else {
+					callback(action);
+				}
+			} else {
+				console.warn('Couldn\'t find an action listener for "' + action.name + '"');
+			}
 		}
 	}
 
@@ -772,19 +846,22 @@ var gameScreen = (function () {
 	var loadedObjects = [],
 		objectActive  = null;
 
-	var container  = document.createElement('div'),
-		stage      = document.createElement('div')
-		background = document.createElement('div');
+	var container  = new RichHTMLElement('div'),
+		stage      = new RichHTMLElement('div')
+		background = new RichHTMLElement('div');
 
-	stage.setAttribute('class', 'stage');
-	background.setAttribute('class', 'background');
+	var overlay  = new RichHTMLElement('div'),
+		backdrop = new RichHTMLElement('div');
 
-	container.setAttribute('id', 'screen');
-	container.setAttribute('tabindex', 0);
-	container.appendChild(stage);
-	container.appendChild(background);
+	stage.addClass('stage');
+	background.addClass('background');
 
-	keys.bindTo(container);
+	container.attr('id', 'screen');
+	container.attr('tabindex', 0);
+	container.append(stage.source);
+	container.append(background.source);
+
+	keys.bindTo(container.source);
 
 	var hold = false;
 
@@ -827,7 +904,7 @@ var gameScreen = (function () {
 	}
 
 	function emptyScreen() {
-		new Array(stage, background).forEach(function (element) {
+		new Array(stage.source, background.source).forEach(function (element) {
 			while (element.firstChild) {
 				element.removeChild(element.firstChild);
 			}
@@ -855,10 +932,10 @@ var gameScreen = (function () {
 		});
 
 		roomActive.tiles.forEach(function (tile) {
-			background.appendChild(tile);
+			background.append(tile);
 		});
 
-		stage.appendChild(objectActive.sprite.element.target);
+		stage.append(objectActive.sprite.element);
 	}
 
 	return {
@@ -884,12 +961,20 @@ var gameScreen = (function () {
 
 			changeRoomTo(index);
 		},
+		prompt: function (message, callback) {
+			console.log('works')
+			if (callback) {
+				_check(callback, 'callback').toBeFunction();
+
+				callback();
+			}
+		},
 		next: function () {
 			updateActiveObject();
 
 			var roomActive = roomList[roomIndex];
 
-			var children = Array.prototype.slice.call(stage.childNodes, 0);
+			var children = stage.children();
 
 			loadedObjects.forEach(function (object, i) {
 				object.correctPosition(roomActive.width, object === objectActive ? null : objectActive);
@@ -904,12 +989,12 @@ var gameScreen = (function () {
 
 				var hidden = x + width < 0 || x >= STAGE_WIDTH || y + height < 0 || y >= STAGE_HEIGHT;
 
-				var target = object.sprite.element.target;
+				var target = object.sprite.element;
 
 				if (hidden && contains(children, target)) {
-					stage.removeChild(target); // remove hidden elements
+					stage.remove(target); // remove hidden elements
 				} else if (!hidden && !contains(children, target)) {
-					stage.appendChild(target); // add visible elements
+					stage.append(target); // add visible elements
 				}
 			});
 
@@ -934,6 +1019,12 @@ var XML_CONFIG = '\
 		<object sprite="door" scroll="40" disabled="true">\
 		</object>\
 		<object sprite="door" scroll="400">\
+			<action name="interact" type="prompt">\
+				lorem ipsum motherfucker 1\
+			</action>\
+			<action name="interact" type="prompt">\
+				lorem ipsum motherfucker 2\
+			</action>\
 			<action name="interact" type="level" index="1" scroll="240">\
 			</action>\
 		</object>\
@@ -959,7 +1050,7 @@ SPRITES.door = new SpriteSheet('door', 0, -10)
 var XMLHelper = (function () {
 	var ACTION_NAMES_ACCEPTED = ['interact'],
 		ACTION_NAME_DEFAULT   = ACTION_NAMES_ACCEPTED[0],
-		ACTION_TYPES_ACCEPTED = ['level'];
+		ACTION_TYPES_ACCEPTED = ['level', 'prompt'];
 
 	var _check = check.bind(null, 'XML Helper');
 
@@ -986,9 +1077,21 @@ var XMLHelper = (function () {
 				_check(index, 'index').toBePositiveInt();
 				_check(scroll, 'scroll').toBePositiveInt();
 
-				return function (action) {
+				return function (action, callback) {
 					gameScreen.change(index, scroll);
+
+					if (callback) {
+						_check(callback, 'callback').toBeFunction();
+					
+						callback();
+					}
 				};
+			case 'prompt':
+				return function (action, callback) {
+					var text = 'derp';
+				
+					gameScreen.prompt(text, callback);
+				}
 		}
 	}
 
@@ -1066,7 +1169,9 @@ var XMLHelper = (function () {
 (function () {
 	var FRAME_STEP = 80;
 
-	document.body.appendChild(gameScreen.getContainer());
+	var body = new RichHTMLElement(document.body);
+
+	body.append(gameScreen.getContainer());
 
 	var player = new DynamicObject('hero', SPRITES.hero.clone(), 0, 8, false),
 		level  = XMLHelper.parse(XML_CONFIG);

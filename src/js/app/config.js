@@ -4,6 +4,12 @@ var XML_CONFIG = '\
 		<object sprite="door" scroll="40" disabled="true">\
 		</object>\
 		<object sprite="door" scroll="400">\
+			<action name="interact" type="prompt">\
+				lorem ipsum motherfucker 1\
+			</action>\
+			<action name="interact" type="prompt">\
+				lorem ipsum motherfucker 2\
+			</action>\
 			<action name="interact" type="level" index="1" scroll="240">\
 			</action>\
 		</object>\

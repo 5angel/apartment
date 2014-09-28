@@ -23,7 +23,7 @@ var SpriteSheet = (function () {
 		this.flipped   = false;
 		this.animation = presets ? presets.initial : null;
 
-		this.element.target.style.backgroundImage = SRC_BASE + name + SRC_TAIL;
+		this.element.source.style.backgroundImage = SRC_BASE + name + SRC_TAIL;
 		this.element.addClass(CLASS_BASE);
 
 		presets = presets || {};
@@ -69,7 +69,7 @@ var SpriteSheet = (function () {
 		var fx = (current.x + (current.frame * current.width)) * 2,
 		    fy = current.y;
 
-	    var style = this.element.target.style;	
+	    var style = this.element.source.style;	
 		
 		style.left = Math.floor((this.x * 2) + (this.offsetX * 2)).toString() + 'px';
 		style.top  = Math.floor((this.y * 2) + (this.offsetY * 2)).toString() + 'px';
@@ -77,7 +77,7 @@ var SpriteSheet = (function () {
 	};
 
 	SpriteSheet.prototype.redraw = function () {
-	    var style   = this.element.target.style,
+	    var style   = this.element.source.style,
 		    current = this.getAnimation();
 
 		current.frame = 0;

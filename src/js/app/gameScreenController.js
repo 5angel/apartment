@@ -8,19 +8,22 @@ var gameScreen = (function () {
 	var loadedObjects = [],
 		objectActive  = null;
 
-	var container  = document.createElement('div'),
-		stage      = document.createElement('div')
-		background = document.createElement('div');
+	var container  = new RichHTMLElement('div'),
+		stage      = new RichHTMLElement('div')
+		background = new RichHTMLElement('div');
 
-	stage.setAttribute('class', 'stage');
-	background.setAttribute('class', 'background');
+	var overlay  = new RichHTMLElement('div'),
+		backdrop = new RichHTMLElement('div');
 
-	container.setAttribute('id', 'screen');
-	container.setAttribute('tabindex', 0);
-	container.appendChild(stage);
-	container.appendChild(background);
+	stage.addClass('stage');
+	background.addClass('background');
 
-	keys.bindTo(container);
+	container.attr('id', 'screen');
+	container.attr('tabindex', 0);
+	container.append(stage.source);
+	container.append(background.source);
+
+	keys.bindTo(container.source);
 
 	var hold = false;
 
@@ -63,7 +66,7 @@ var gameScreen = (function () {
 	}
 
 	function emptyScreen() {
-		new Array(stage, background).forEach(function (element) {
+		new Array(stage.source, background.source).forEach(function (element) {
 			while (element.firstChild) {
 				element.removeChild(element.firstChild);
 			}
@@ -91,13 +94,64 @@ var gameScreen = (function () {
 		});
 
 		roomActive.tiles.forEach(function (tile) {
-			background.appendChild(tile);
+			background.append(tile);
 		});
 
-		stage.appendChild(objectActive.sprite.element.target);
+		stage.append(objectActive.sprite.element);
 	}
 
+	function nextFrame() {
+		updateActiveObject();
+
+		var roomActive = roomList[roomIndex];
+
+		var children = stage.children();
+
+		loadedObjects.forEach(function (object, i) {
+			object.correctPosition(roomActive.width, object === objectActive ? null : objectActive);
+			object.sprite.step();
+			object.sprite.update();
+
+			var x = object.sprite.x,
+				y = object.sprite.y;
+
+			var width  = object.sprite.getFrameWidth(),
+				height = object.sprite.getFrameHeight();
+
+			var hidden = x + width < 0 || x >= STAGE_WIDTH || y + height < 0 || y >= STAGE_HEIGHT;
+
+			var target = object.sprite.element;
+
+			if (hidden && contains(children, target)) {
+				stage.remove(target); // remove hidden elements
+			} else if (!hidden && !contains(children, target)) {
+				stage.append(target); // add visible elements
+			}
+		});
+
+		var offset = objectActive.scroll;
+
+		if (objectActive.leftCornerReached()) {
+			offset = 0;
+		} else if (objectActive.rightCornerReached(roomActive.width)) {
+			offset = roomActive.width;
+		}
+
+		roomActive.updateTiles(Math.floor(offset));
+	}
+
+	var loop = null;
+
 	return {
+		start: function () {
+			loop = setInterval(nextFrame, FRAME_STEP);
+		},
+		stop: function () {
+			if (loop) {
+				clearInterval(loop);
+				loop = null;
+			}
+		},
 		load: function (rooms, spawn, target) {
 			roomList     = rooms;
 			objectActive = target;
@@ -120,44 +174,12 @@ var gameScreen = (function () {
 
 			changeRoomTo(index);
 		},
-		next: function () {
-			updateActiveObject();
+		prompt: function (message, callback) {
+			if (callback) {
+				_check(callback, 'callback').toBeFunction();
 
-			var roomActive = roomList[roomIndex];
-
-			var children = Array.prototype.slice.call(stage.childNodes, 0);
-
-			loadedObjects.forEach(function (object, i) {
-				object.correctPosition(roomActive.width, object === objectActive ? null : objectActive);
-				object.sprite.step();
-				object.sprite.update();
-
-				var x = object.sprite.x,
-					y = object.sprite.y;
-
-				var width  = object.sprite.getFrameWidth(),
-					height = object.sprite.getFrameHeight();
-
-				var hidden = x + width < 0 || x >= STAGE_WIDTH || y + height < 0 || y >= STAGE_HEIGHT;
-
-				var target = object.sprite.element.target;
-
-				if (hidden && contains(children, target)) {
-					stage.removeChild(target); // remove hidden elements
-				} else if (!hidden && !contains(children, target)) {
-					stage.appendChild(target); // add visible elements
-				}
-			});
-
-			var offset = objectActive.scroll;
-
-			if (objectActive.leftCornerReached()) {
-				offset = 0;
-			} else if (objectActive.rightCornerReached(roomActive.width)) {
-				offset = roomActive.width;
+				callback();
 			}
-
-			roomActive.updateTiles(Math.floor(offset));
 		},
 		getContainer: function () {
 			return container;
